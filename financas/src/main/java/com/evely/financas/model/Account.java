@@ -1,8 +1,7 @@
 package com.evely.financas.model;
+
 import java.math.BigDecimal;
-
 import com.evely.financas.enums.AccountType;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -20,8 +19,8 @@ import lombok.*;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-
 public class Account {
+    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column (name = "id_account")
