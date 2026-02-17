@@ -1,0 +1,26 @@
+services:
+  db-financas:
+    image: mysql:8.0
+    container_name: db_app_financas
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+    networks:
+      - rede-financas
+  adminer:
+    image: adminer:latest
+    container_name: adminer_app_financas
+    restart: always
+    ports:
+      - "8080:8080"
+    networks:
+      - rede-financas
+
+networks:
+  rede-financas:
+    driver: bridge
