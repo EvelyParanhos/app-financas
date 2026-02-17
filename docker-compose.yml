@@ -17,7 +17,7 @@ services:
     container_name: adminer_app_financas
     restart: always
     ports:
-      - "8080:8080"
+      - "8081:8080"
     networks:
       - rede-financas
 

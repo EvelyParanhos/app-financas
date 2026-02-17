@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-FinancasApplication<financas>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.evely.financas.FinancasApplication",
+            "projectName": "financas",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
