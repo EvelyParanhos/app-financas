@@ -18,7 +18,7 @@ public class TransactionController {
     private final TransactionService transactionService;
 
     @PostMapping
-    public ResponseEntity<String> salvar(
+    public ResponseEntity<String> registrarTransacao(
             @RequestBody Transaction transaction, 
             @RequestParam(defaultValue = "1") int parcelas,
             @RequestParam String telegramId) { 
