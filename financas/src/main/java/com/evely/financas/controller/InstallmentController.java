@@ -28,8 +28,8 @@ public class InstallmentController {
     }
 
     @PostMapping("/{id}/assumir")
-    public ResponseEntity<String> assumirParcela(@PathVariable Integer installmentId, @RequestParam Integer novoPayerId) {
-        installmentService.assumirParcelaTotal(installmentId, novoPayerId);
+    public ResponseEntity<String> assumirParcela(@PathVariable Integer id, @RequestParam Integer novoPayerId) {
+        installmentService.assumirParcelaTotal(id, novoPayerId);
         return ResponseEntity.ok("Parcela assumida para outro pagador com sucesso!");
     }
     
