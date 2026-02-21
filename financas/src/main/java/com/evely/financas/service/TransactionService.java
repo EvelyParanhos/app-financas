@@ -38,7 +38,13 @@ public class TransactionService {
             parcela.setDueDate(transacaoSalva.getPurchaseDate().plusMonths(i));
             parcela.setPayer(pagador);
 
-            installmentRepository.save(parcela);
+            transacao.getInstallments().add(parcela);
         }
+    }
+
+    public void excluir(Integer id) {
+    Transaction transaction = transactionRepository.findById(id)
+        .orElseThrow(() -> new RuntimeException("Transação não encontrada!"));
+    transactionRepository.delete(transaction);
     }
 }
