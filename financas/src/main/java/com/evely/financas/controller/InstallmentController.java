@@ -3,8 +3,10 @@ package com.evely.financas.controller;
 import com.evely.financas.model.Installment;
 import com.evely.financas.service.InstallmentService;
 import lombok.RequiredArgsConstructor;
+import java.math.BigDecimal;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
 
 @RestController
 @RequestMapping("/api/installments")
@@ -18,4 +20,11 @@ public class InstallmentController {
         Installment paga = installmentService.pagarParcela(id);
         return ResponseEntity.ok(paga);
     }
+
+    @PostMapping("/{id}/split")
+    public ResponseEntity <String> dividirParcela(@PathVariable Integer id, @RequestParam BigDecimal valorPayer1, @RequestParam Integer idPayer2) {
+        installmentService.dividirParcela(id, valorPayer1, idPayer2);
+        return ResponseEntity.ok("Parcela dividiva com sucesso!");
+    }
+    
 } 
