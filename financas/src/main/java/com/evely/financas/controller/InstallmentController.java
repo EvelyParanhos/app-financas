@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import java.math.BigDecimal;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.PostMapping;
+
 
 @RestController
 @RequestMapping("/api/installments")
@@ -25,6 +25,12 @@ public class InstallmentController {
     public ResponseEntity <String> dividirParcela(@PathVariable Integer id, @RequestParam BigDecimal valorPayer1, @RequestParam Integer idPayer2) {
         installmentService.dividirParcela(id, valorPayer1, idPayer2);
         return ResponseEntity.ok("Parcela dividiva com sucesso!");
+    }
+
+    @PostMapping("/{id}/assumir")
+    public ResponseEntity<String> assumirParcela(@PathVariable Integer installmentId, @RequestParam Integer novoPayerId) {
+        installmentService.assumirParcelaTotal(installmentId, novoPayerId);
+        return ResponseEntity.ok("Parcela assumida para outro pagador com sucesso!");
     }
     
 } 

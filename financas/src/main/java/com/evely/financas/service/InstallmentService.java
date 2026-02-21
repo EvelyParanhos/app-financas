@@ -53,4 +53,13 @@ public class InstallmentService {
         installmentRepository.save(original);
         installmentRepository.save(irma);
     }
+
+    public void assumirParcelaTotal(Integer installmentId, Integer novoPayerId) {
+        Installment parcela = installmentRepository.findById(installmentId)
+                .orElseThrow(() -> new RuntimeException("Parcela não encontrada!"));
+        User novoPagador = userRepository.findById(novoPayerId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
+        parcela.setPayer(novoPagador);
+        installmentRepository.save(parcela);
+    }
 }
