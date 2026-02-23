@@ -54,18 +54,14 @@ public class TransactionService {
 
         return transacaoSalva;
     }
-    private void processarMovimentacao (Account conta, BigDecimal valor, String direcao, TransactionType tipo) {
+    private void processarMovimentacao(Account conta, BigDecimal valor, String direcao) {
         BigDecimal saldoAnterior = snapshotRepository.findFirstByAccountOrderBySnapshotDateDesc(conta)
-            .map(Snapshot::getAmount).orElse(BigDecimal.ZERO);
+            .map(Snapshot::getAmount)
+            .orElse(BigDecimal.ZERO);
 
-        BigDecimal novoSaldo;
-
-        if(direcao.equals("SAIDA") || tipo == TransactionType.EXPENSE || tipo == TransactionType.LOAN_OUT) {
-            novoSaldo = saldoAnterior.subtract(valor);
-        }
-        else {
-            novoSaldo = saldoAnterior.add(valor);
-        }
+        BigDecimal novoSaldo = direcao.equals("SAIDA") 
+        ? saldoAnterior.subtract(valor) 
+        : saldoAnterior.add(valor);
 
         Snapshot novoSnapshot = new Snapshot();
         novoSnapshot.setAccount(conta);
@@ -84,7 +80,6 @@ public class TransactionService {
         String direcaoOrigem = (transacao.getType() == TransactionType.INCOME) ? "ENTRADA" : "SAIDA";
         processarMovimentacao(transacao.getAccount(), transacao.getTotalAmount(), direcaoOrigem);
 
-        // Movimentação na conta de DESTINO (Só acontece se for TRANSFER)
         if (transacao.getType() == TransactionType.TRANSFER && transacao.getDestinationAccount() != null) {
             processarMovimentacao(transacao.getDestinationAccount(), transacao.getTotalAmount(), "ENTRADA");
         }
