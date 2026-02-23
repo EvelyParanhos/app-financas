@@ -8,7 +8,6 @@ import com.evely.financas.repository.TransactionRepository;
 import com.evely.financas.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-
 import com.evely.financas.enums.AccountType;
 import com.evely.financas.enums.InstallmentStatus;
 import com.evely.financas.enums.TransactionType;
@@ -55,6 +54,25 @@ public class TransactionService {
 
         return transacaoSalva;
     }
+    private void processarMovimentacao (Account conta, BigDecimal valor, String direcao, TransactionType tipo) {
+        BigDecimal saldoAnterior = snapshotRepository.findFirstByAccountOrderBySnapshotDateDesc(conta)
+            .map(Snapshot::getAmount).orElse(BigDecimal.ZERO);
+
+        BigDecimal novoSaldo;
+
+        if(direcao.equals("SAIDA") || tipo == TransactionType.EXPENSE || tipo == TransactionType.LOAN_OUT) {
+            novoSaldo = saldoAnterior.subtract(valor);
+        }
+        else {
+            novoSaldo = saldoAnterior.add(valor);
+        }
+
+        Snapshot novoSnapshot = new Snapshot();
+        novoSnapshot.setAccount(conta);
+        novoSnapshot.setAmount(novoSaldo);
+        novoSnapshot.setSnapshotDate(LocalDateTime.now());
+        snapshotRepository.save(novoSnapshot);
+    }
 
     public void excluir(Integer id) {
     Transaction transaction = transactionRepository.findById(id)
@@ -63,25 +81,12 @@ public class TransactionService {
     }
 
     private void atualizarSaldoAutomatico(Transaction transacao) {
-        Account conta = transacao.getAccount();
+        String direcaoOrigem = (transacao.getType() == TransactionType.INCOME) ? "ENTRADA" : "SAIDA";
+        processarMovimentacao(transacao.getAccount(), transacao.getTotalAmount(), direcaoOrigem);
 
-        BigDecimal saldoAnterior = snapshotRepository.findFirstByAccountOrderBySnapshotDateDesc(conta)
-                .map(Snapshot::getAmount)
-                .orElse(BigDecimal.ZERO);
-        BigDecimal novoSaldo;
-        if (transacao.getType() == TransactionType.INCOME) {
-            novoSaldo = saldoAnterior.add(transacao.getTotalAmount());
-        } else if (transacao.getType() == TransactionType.EXPENSE || transacao.getType() ==TransactionType.LOAN_OUT) {
-            novoSaldo = saldoAnterior.subtract(transacao.getTotalAmount());
-        } else { //vai ser preciso tratar a questão de quando sai em uma conta para entrar em outra
-            novoSaldo = saldoAnterior;
+        // Movimentação na conta de DESTINO (Só acontece se for TRANSFER)
+        if (transacao.getType() == TransactionType.TRANSFER && transacao.getDestinationAccount() != null) {
+            processarMovimentacao(transacao.getDestinationAccount(), transacao.getTotalAmount(), "ENTRADA");
         }
-
-        Snapshot novoSnapshot = new Snapshot();
-        novoSnapshot.setAccount(conta);
-        novoSnapshot.setAmount(novoSaldo);
-        novoSnapshot.setSnapshotDate(LocalDateTime.now());
-
-        snapshotRepository.save(novoSnapshot);
     }
 }
