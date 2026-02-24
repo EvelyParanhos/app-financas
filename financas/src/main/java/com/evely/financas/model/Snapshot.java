@@ -31,6 +31,6 @@ public class Snapshot {
     
     private BigDecimal amount;
 
-    @Column (name = "date")
+    @Column (name = "snapshot_date")
     private LocalDateTime snapshotDate;
 }

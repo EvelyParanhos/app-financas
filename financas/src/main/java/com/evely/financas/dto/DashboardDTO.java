@@ -10,4 +10,5 @@ public class DashboardDTO {
     private BigDecimal totalDebts;
     private BigDecimal currentBalance;
     private BigDecimal leftover;
+    private boolean isProjection;
 }

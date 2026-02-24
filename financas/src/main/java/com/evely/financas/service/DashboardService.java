@@ -42,7 +42,7 @@ public class DashboardService {
 
         BigDecimal leftover = currentBalance.subtract(totalDebts);
 
-        return new DashboardDTO(totalDebts, currentBalance, leftover);
+        return new DashboardDTO(totalDebts, currentBalance, leftover, false);
     }
 
     public DashboardDTO getResumoCasal(Integer idUser1, Integer idUser2) {
@@ -52,7 +52,8 @@ public class DashboardService {
         return new DashboardDTO(
             d1.getTotalDebts().add(d2.getTotalDebts()),
             d1.getCurrentBalance().add(d2.getCurrentBalance()),
-            d1.getLeftover().add(d2.getLeftover())
+            d1.getLeftover().add(d2.getLeftover()),
+            false
         );
     }   
 }
