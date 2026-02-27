@@ -37,10 +37,10 @@ public class Account {
     private AccountType type;
 
     @Column (name = "closing_day")
-    private int closingDay;
+    private Integer closingDay;
 
     @Column (name = "due_day")
-    private int dueDay;
+    private Integer dueDay;
 
     @Column (name = "card_limit")
     private BigDecimal cardLimit;
