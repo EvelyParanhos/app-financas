@@ -2,8 +2,12 @@ package com.evely.financas.model;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.hibernate.annotations.CreationTimestamp;
+
 import com.evely.financas.enums.TransactionType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -58,4 +62,8 @@ public class Transaction {
     @ManyToOne
     @JoinColumn(name = "destination_account_id")
     private Account destinationAccount;
+
+    @CreationTimestamp 
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 }

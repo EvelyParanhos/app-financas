@@ -84,4 +84,24 @@ public class TransactionService {
             processarMovimentacao(transacao.getDestinationAccount(), transacao.getTotalAmount(), "ENTRADA");
         }
     }
+
+    @Transactional
+    public void efetivarSimulacao(Integer transactionId) {
+        Transaction transacao = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new RuntimeException("Simulação não encontrada!"));
+
+        if (!transacao.isSimulation()) {
+            throw new RuntimeException("Esta transação já é real!");
+        }
+
+        // Torna a transação oficial
+        transacao.setSimulation(false);
+        
+        // Aciona o gatilho de saldo (Snapshot) 
+        if (transacao.getAccount().getType() != AccountType.CREDIT_CARD) {
+            atualizarSaldoAutomatico(transacao);
+        }
+
+        transactionRepository.save(transacao);
+    }
 }
