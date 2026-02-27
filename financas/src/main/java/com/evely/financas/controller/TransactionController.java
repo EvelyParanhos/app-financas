@@ -36,7 +36,7 @@ public class TransactionController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/efetivar/{id}")
+    @PostMapping("/efetivar/{simulationId}")
     public ResponseEntity<String> efetivarSimulacao (@PathVariable Integer simulationId) {
         transactionService.efetivarSimulacao(simulationId);
 
