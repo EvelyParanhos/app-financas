@@ -64,6 +64,10 @@ public class TransactionService {
         ? saldoAnterior.subtract(valor) 
         : saldoAnterior.add(valor);
 
+        if (novoSaldo.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Operação cancelada: Saldo insuficiente na conta " + conta.getName());
+        }
+
         Snapshot novoSnapshot = new Snapshot();
         novoSnapshot.setAccount(conta);
         novoSnapshot.setAmount(novoSaldo);
