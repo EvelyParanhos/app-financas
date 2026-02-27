@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
-
 import org.springframework.stereotype.Service;
 import com.evely.financas.dto.DashboardDTO;
 import com.evely.financas.enums.InstallmentStatus;
@@ -13,7 +12,6 @@ import com.evely.financas.model.Snapshot;
 import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.InstallmentRepository;
 import com.evely.financas.repository.SnapshotRepository;
-
 import lombok.RequiredArgsConstructor;
 
 @Service

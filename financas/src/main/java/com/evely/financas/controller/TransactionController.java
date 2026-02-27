@@ -8,6 +8,8 @@ import com.evely.financas.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 
 @RestController
@@ -26,5 +28,11 @@ public class TransactionController {
         transactionService.registrarTransacao(transaction, parcelas, telegramId);
         
         return ResponseEntity.status(201).body("Transação registrada com " + parcelas + " parcela(s) no usuário com id: " + telegramId);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir (@PathVariable Integer id) {
+        transactionService.excluir(id);
+        return ResponseEntity.noContent().build();
     }
 }
