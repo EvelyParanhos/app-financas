@@ -52,8 +52,12 @@ public class TransactionService {
             atualizarSaldoAutomatico(transacaoSalva);
         } 
 
+        if (!transacaoSalva.isSimulation() && transacaoSalva.getAccount().getType() != AccountType.CREDIT_CARD) {
+            atualizarSaldoAutomatico(transacaoSalva);
+        }
         return transacaoSalva;
     }
+
     private void processarMovimentacao(Account conta, BigDecimal valor, String direcao) {
         BigDecimal saldoAnterior = snapshotRepository.findFirstByAccountOrderBySnapshotDateDesc(conta)
             .map(Snapshot::getAmount)
