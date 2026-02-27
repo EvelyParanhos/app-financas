@@ -75,4 +75,5 @@ public class DashboardService {
 
         return new DashboardDTO(totalDebts, currentBalance, leftover, true);
     }
+
 }
