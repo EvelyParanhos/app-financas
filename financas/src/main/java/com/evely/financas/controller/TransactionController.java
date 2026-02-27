@@ -35,4 +35,11 @@ public class TransactionController {
         transactionService.excluir(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/efetivar/{id}")
+    public ResponseEntity<String> efetivarSimulacao (@PathVariable Integer simulationId) {
+        transactionService.efetivarSimulacao(simulationId);
+
+        return ResponseEntity.status(200).body("Perfeito! Deixou de ser uma simulação e passou a ser uma transação real! Seu dashboard atualizou!");
+    }
 }

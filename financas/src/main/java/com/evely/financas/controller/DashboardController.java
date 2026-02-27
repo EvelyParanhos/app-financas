@@ -26,4 +26,6 @@ public class DashboardController {
     public ResponseEntity <DashboardDTO> getResumoCasal(@RequestParam Integer id1, @RequestParam Integer id2) {
         return ResponseEntity.ok(dashboardService.getResumoCasal(id1, id2));
     }
+
+    
 }
