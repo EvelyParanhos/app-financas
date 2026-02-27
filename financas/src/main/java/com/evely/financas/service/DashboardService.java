@@ -6,6 +6,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import com.evely.financas.dto.DashboardDTO;
+import com.evely.financas.enums.AccountType;
 import com.evely.financas.enums.InstallmentStatus;
 import com.evely.financas.model.Account;
 import com.evely.financas.model.Snapshot;
@@ -53,5 +54,25 @@ public class DashboardService {
             d1.getLeftover().add(d2.getLeftover()),
             false
         );
-    }   
+    } 
+
+    public DashboardDTO getResumoCompleto(Integer userId, int mes, int ano, boolean incluirSimulacoes) {
+        LocalDate inicioMes = LocalDate.of(ano, mes, 1);
+        LocalDate fimMes = inicioMes.with(TemporalAdjusters.lastDayOfMonth());
+
+        BigDecimal totalDebts = installmentRepository.somarDividasComFiltro(
+                userId, inicioMes, fimMes, incluirSimulacoes
+        );
+
+        BigDecimal currentBalance = accountRepository.findByOwnerId(userId).stream()
+                .filter(acc -> acc.getType() == AccountType.CHECKING || acc.getType() == AccountType.CASH)
+                .map(acc -> snapshotRepository.findFirstByAccountOrderBySnapshotDateDesc(acc)
+                        .map(Snapshot::getAmount)
+                        .orElse(BigDecimal.ZERO))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal leftover = currentBalance.subtract(totalDebts != null ? totalDebts : BigDecimal.ZERO);
+
+        return new DashboardDTO(totalDebts, currentBalance, leftover, true);
+    }
 }
