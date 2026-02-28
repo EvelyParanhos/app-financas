@@ -65,7 +65,10 @@ public class TransactionService {
         : saldoAnterior.add(valor);
 
         if (novoSaldo.compareTo(BigDecimal.ZERO) < 0) {
-            throw new RuntimeException("Operação cancelada: Saldo insuficiente na conta " + conta.getName());
+        String mensagem = (conta.getType() == AccountType.CREDIT_CARD) 
+            ? "Cartão recusado: Limite insuficiente!" 
+            : "Operação cancelada: Saldo insuficiente!";
+        throw new RuntimeException(mensagem);
         }
 
         Snapshot novoSnapshot = new Snapshot();
