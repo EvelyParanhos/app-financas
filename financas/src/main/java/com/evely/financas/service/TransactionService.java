@@ -48,7 +48,7 @@ public class TransactionService {
 
         Transaction transacaoSalva = transactionRepository.save(transacao);
 
-        if (!transacaoSalva.isSimulation() && transacaoSalva.getAccount().getType() != AccountType.CREDIT_CARD) {
+        if (!transacaoSalva.isSimulation()) {
             atualizarSaldoAutomatico(transacaoSalva);
         }
         
