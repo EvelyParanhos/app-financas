@@ -1,8 +1,8 @@
 package com.evely.financas.model;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 import com.evely.financas.enums.TransactionType;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -26,7 +26,7 @@ public class RecurringTransaction {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column (name = "id_recurring_transaction", updatable = false, nullable = false)
-    private Integer id;
+    private UUID id;
 
     private String description; 
     

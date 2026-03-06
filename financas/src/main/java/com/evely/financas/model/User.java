@@ -1,5 +1,6 @@
 package com.evely.financas.model;
 
+import java.util.UUID;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -17,7 +18,7 @@ public class User {
     @Id
     @GeneratedValue (strategy = GenerationType.UUID)
     @Column (name = "id_user", updatable = false, nullable = false)
-    private Integer Id;
+    private UUID Id;
 
     private String name;
 

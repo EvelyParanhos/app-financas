@@ -1,6 +1,7 @@
 package com.evely.financas.model;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 import com.evely.financas.enums.AccountType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -24,7 +25,7 @@ public class Account {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column (name = "id_account", updatable = false, nullable = false)
-    private Integer id;
+    private UUID id;
 
     private String name;
 

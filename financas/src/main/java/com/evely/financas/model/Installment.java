@@ -2,6 +2,7 @@ package com.evely.financas.model;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 import com.evely.financas.enums.InstallmentStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -24,7 +25,7 @@ public class Installment {
     @Id
     @GeneratedValue (strategy = GenerationType.UUID)
     @Column (name = "id_installment", updatable = false, nullable = false)
-    private Integer id;
+    private UUID id;
 
     @ManyToOne
     @JoinColumn (name = "transaction_id")
