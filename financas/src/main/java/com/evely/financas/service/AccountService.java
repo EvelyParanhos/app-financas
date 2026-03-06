@@ -2,6 +2,7 @@ package com.evely.financas.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import com.evely.financas.enums.AccountType;
 import com.evely.financas.model.Account;
@@ -22,7 +23,7 @@ public class AccountService {
 
     @Transactional
     public Account salvar (Account account) {
-        Integer ownerId = account.getOwner().getId();
+        UUID ownerId = account.getOwner().getId();
 
         userRepository.findById(ownerId)
             .orElseThrow(()->new RuntimeException("Não foi possível criar a conta: Usuário dono não encontrado!"));
@@ -44,11 +45,11 @@ public class AccountService {
         return accountRepository.findAll();
     }
 
-    public void excluir(Integer id) {
+    public void excluir(UUID id) {
         accountRepository.deleteById(id);
     }
 
-    public Account editar (Integer id, Account accountAtualizada) {
+    public Account editar (UUID id, Account accountAtualizada) {
         Account accountExistente = accountRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Conta não encontrada com o ID: " + id));
             

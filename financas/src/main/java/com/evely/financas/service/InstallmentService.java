@@ -5,10 +5,10 @@ import com.evely.financas.model.Installment;
 import com.evely.financas.model.User;
 import com.evely.financas.repository.InstallmentRepository;
 import com.evely.financas.repository.UserRepository;
-
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import java.math.BigDecimal;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,7 +18,7 @@ public class InstallmentService {
     private final InstallmentRepository installmentRepository;
     private final UserRepository userRepository;
 
-    public Installment pagarParcela(Integer id) {
+    public Installment pagarParcela(UUID id) {
         Installment parcela = installmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Parcela não encontrada!"));
         parcela.setStatus(InstallmentStatus.PAID);
@@ -26,7 +26,7 @@ public class InstallmentService {
     }
 
     @Transactional
-    public void dividirParcela (Integer installmentId, BigDecimal valorPayer1, Integer idPayer2) {
+    public void dividirParcela (UUID installmentId, BigDecimal valorPayer1, UUID idPayer2) {
         Installment original = installmentRepository.findById(installmentId)
             .orElseThrow(() -> new RuntimeException("Parcela não encontrada!"));
         
@@ -54,7 +54,7 @@ public class InstallmentService {
         installmentRepository.save(irma);
     }
 
-    public void assumirParcelaTotal(Integer installmentId, Integer novoPayerId) {
+    public void assumirParcelaTotal(UUID installmentId, UUID novoPayerId) {
         Installment parcela = installmentRepository.findById(installmentId)
                 .orElseThrow(() -> new RuntimeException("Parcela não encontrada!"));
         User novoPagador = userRepository.findById(novoPayerId)

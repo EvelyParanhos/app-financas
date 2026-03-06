@@ -1,6 +1,7 @@
 package com.evely.financas.service;
 
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import com.evely.financas.model.Category;
 import com.evely.financas.repository.CategoryRepository;
@@ -19,11 +20,11 @@ public class CategoryService {
         return categoryRepository.findAll();
     }
 
-    public void excluir(Integer id) {
+    public void excluir(UUID id) {
         categoryRepository.deleteById(id);
     }
     
-    public Category atualizar(Integer id, Category categoriaAtualizada) {
+    public Category atualizar(UUID id, Category categoriaAtualizada) {
         Category categoriaExistente = categoryRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Categoria não encontrada com o ID: " + id));
 
