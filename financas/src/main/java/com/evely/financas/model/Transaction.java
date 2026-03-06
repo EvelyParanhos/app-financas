@@ -30,8 +30,8 @@ import lombok.*;
 @AllArgsConstructor
 public class Transaction {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column (name = "id_transaction")
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column (name = "id_transaction", updatable = false, nullable = false)
     private Integer id;
 
     private String description;

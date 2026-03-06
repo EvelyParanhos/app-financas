@@ -22,8 +22,8 @@ import lombok.*;
 public class Account {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column (name = "id_account")
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column (name = "id_account", updatable = false, nullable = false)
     private Integer id;
 
     private String name;

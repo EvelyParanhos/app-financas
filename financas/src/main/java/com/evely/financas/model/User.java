@@ -15,8 +15,8 @@ import lombok.*;
 @AllArgsConstructor
 public class User {
     @Id
-    @GeneratedValue (strategy = GenerationType.IDENTITY)
-    @Column (name = "id_user")
+    @GeneratedValue (strategy = GenerationType.UUID)
+    @Column (name = "id_user", updatable = false, nullable = false)
     private Integer Id;
 
     private String name;

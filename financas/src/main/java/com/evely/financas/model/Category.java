@@ -18,8 +18,8 @@ import lombok.*;
 @NoArgsConstructor
 public class Category {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column (name = "id_category")
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column (name = "id_category", updatable = false, nullable = false)
     private Integer id;
 
     private String name;

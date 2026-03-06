@@ -22,8 +22,8 @@ import lombok.*;
 @AllArgsConstructor
 public class Installment {
     @Id
-    @GeneratedValue (strategy = GenerationType.IDENTITY)
-    @Column (name = "id_installment")
+    @GeneratedValue (strategy = GenerationType.UUID)
+    @Column (name = "id_installment", updatable = false, nullable = false)
     private Integer id;
 
     @ManyToOne

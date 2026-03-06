@@ -21,8 +21,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class Snapshot {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column (name = "id_snapshot")
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column (name = "id_snapshot", nullable = false, updatable = false)
     private Integer id;
 
     @ManyToOne
