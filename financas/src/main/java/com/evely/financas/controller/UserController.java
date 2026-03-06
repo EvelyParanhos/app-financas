@@ -6,6 +6,7 @@ import com.evely.financas.model.User;
 import com.evely.financas.service.UserService;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -32,13 +33,13 @@ public class UserController {
     }
 
     @DeleteMapping ("/{id}")
-    public ResponseEntity<Void> excluir (@PathVariable Integer id) {
+    public ResponseEntity<Void> excluir (@PathVariable UUID id) {
         userService.excluir(id);
         return ResponseEntity.noContent().build();
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity <User> editar(@PathVariable Integer id, @RequestBody User user) {
+    public ResponseEntity <User> editar(@PathVariable UUID id, @RequestBody User user) {
         return ResponseEntity.ok(userService.editar(id, user));
     }
 }

@@ -6,6 +6,7 @@ import com.evely.financas.model.Category;
 import com.evely.financas.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -33,13 +34,13 @@ public class CategoryController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable Integer id) {
+    public ResponseEntity<Void> deletar(@PathVariable UUID id) {
         categoryService.excluir(id);
         return ResponseEntity.noContent().build(); 
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity<Category> editar(@PathVariable Integer id, @RequestBody Category category) {
+    public ResponseEntity<Category> editar(@PathVariable UUID id, @RequestBody Category category) {
         Category atualizada = categoryService.atualizar(id, category);
         return ResponseEntity.ok(atualizada);
     }
