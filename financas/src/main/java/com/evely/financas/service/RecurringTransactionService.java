@@ -34,7 +34,7 @@ public class RecurringTransactionService {
             novaTransacao.setCategory(molde.getCategory());
             novaTransacao.setPurchaseDate(LocalDate.now());
 
-            transactionService.registrarTransacao(novaTransacao, 1, molde.getAccount().getOwner().getTelegramId());
+            transactionService.registrarTransacao(novaTransacao, 1, molde.getAccount().getOwner().getId());
         }
     }
 }

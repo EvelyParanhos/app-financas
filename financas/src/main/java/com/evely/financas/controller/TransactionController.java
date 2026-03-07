@@ -24,11 +24,11 @@ public class TransactionController {
     public ResponseEntity<String> registrarTransacao(
             @RequestBody Transaction transaction, 
             @RequestParam(defaultValue = "1") int parcelas,
-            @RequestParam String telegramId) { 
+            @RequestParam UUID UserID) { 
         
-        transactionService.registrarTransacao(transaction, parcelas, telegramId);
+        transactionService.registrarTransacao(transaction, parcelas, UserID);
         
-        return ResponseEntity.status(201).body("Transação registrada com " + parcelas + " parcela(s) no usuário com id: " + telegramId);
+        return ResponseEntity.status(201).body("Transação registrada com " + parcelas + " parcelas");
     }
 
     @DeleteMapping("/{id}")

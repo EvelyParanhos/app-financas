@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
 public class Snapshot {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column (name = "id_snapshot", nullable = false, updatable = false)
+    @Column (name = "id", nullable = false, updatable = false)
     private UUID id;
 
     @ManyToOne
