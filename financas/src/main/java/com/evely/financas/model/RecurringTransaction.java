@@ -25,7 +25,7 @@ import lombok.NoArgsConstructor;
 public class RecurringTransaction {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column (name = "id_recurring_transaction", updatable = false, nullable = false)
+    @Column (name = "id", updatable = false, nullable = false)
     private UUID id;
 
     private String description; 

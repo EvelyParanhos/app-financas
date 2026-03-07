@@ -24,7 +24,7 @@ import lombok.*;
 public class Installment {
     @Id
     @GeneratedValue (strategy = GenerationType.UUID)
-    @Column (name = "id_installment", updatable = false, nullable = false)
+    @Column (name = "id", updatable = false, nullable = false)
     private UUID id;
 
     @ManyToOne

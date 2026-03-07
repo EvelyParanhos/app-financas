@@ -2,6 +2,7 @@ package com.evely.financas.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import com.evely.financas.enums.AccountType;
 import com.evely.financas.enums.InstallmentStatus;
 import com.evely.financas.enums.TransactionType;
+import com.evely.financas.enums.UserStatus;
 import com.evely.financas.model.Account;
 import com.evely.financas.model.Installment;
 import com.evely.financas.model.Snapshot;
@@ -29,21 +31,29 @@ public class TransactionService {
     private final SnapshotRepository snapshotRepository;
 
     @Transactional
-    public Transaction registrarTransacao (Transaction transacao, int totalParcelas, String telegramId) {
-        User pagador = userRepository.findByTelegramId(telegramId)
-            .orElseThrow(() -> new RuntimeException("Usuário do Telegram não cadastrado!"));
+    public Transaction registrarTransacao(Transaction transacao, int totalParcelas, UUID userId) {
+        User pagador = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
 
-        BigDecimal valorParcela = transacao.getTotalAmount().divide(BigDecimal.valueOf(totalParcelas), 2, RoundingMode.HALF_UP);
+        // Proteção: Só usuários ativos podem registrar gastos reais
+        if (!transacao.isSimulation() && !pagador.getStatus().equals(UserStatus.ACTIVE)) {
+            throw new RuntimeException("Sua conta precisa estar ATIVA para registrar gastos reais.");
+        }
 
-        for (int i=1; i <= totalParcelas; i++) {
+        BigDecimal valorParcela = transacao.getTotalAmount()
+                .divide(BigDecimal.valueOf(totalParcelas), 2, RoundingMode.HALF_UP);
+
+        for (int i = 1; i <= totalParcelas; i++) {
             Installment parcela = new Installment();
             parcela.setInstallmentNumber(i);
             parcela.setStatus(InstallmentStatus.PENDING);
             parcela.setTransaction(transacao);
             parcela.setAmount(valorParcela);
-            parcela.setDueDate(transacao.getPurchaseDate().plusMonths(i));
+            
+            LocalDate dataBase = transacao.getPurchaseDate() != null ? transacao.getPurchaseDate() : LocalDate.now();
+            parcela.setDueDate(dataBase.plusMonths(i - 1)); 
+            
             parcela.setPayer(pagador);
-
             transacao.getInstallments().add(parcela);
         }
 
