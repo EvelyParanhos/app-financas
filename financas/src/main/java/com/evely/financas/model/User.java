@@ -55,7 +55,4 @@ public class User {
 
     @Column(name = "invite_code", unique = true)
     private String inviteCode;
-
-    @Column(name = "invite_expiry")
-    private LocalDateTime inviteExpiry;
 }
