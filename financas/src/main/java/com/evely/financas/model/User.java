@@ -1,5 +1,7 @@
 package com.evely.financas.model;
 
+import java.time.LocalDateTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -23,4 +25,10 @@ public class User {
 
     @Column (name = "telegram_id")
     private String telegramId;
+
+    @Column(name = "invite_code", unique = true)
+    private String inviteCode;
+
+    @Column(name = "invite_expiry")
+    private LocalDateTime inviteExpiry;
 }

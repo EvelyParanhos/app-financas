@@ -44,4 +44,7 @@ public class Account {
 
     @Column (name = "card_limit")
     private BigDecimal cardLimit;
+    
+    @Column(name = "is_shared")
+    private boolean shared;
 }

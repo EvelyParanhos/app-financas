@@ -8,4 +8,5 @@ import com.evely.financas.model.User;
 @Repository
 public interface UserRepository extends JpaRepository <User, Integer> {
     Optional<User> findByTelegramId(String telegramId);
+    Optional<User> findByInviteCode(String codigo);
 }
