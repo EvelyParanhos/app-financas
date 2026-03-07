@@ -51,7 +51,7 @@ public class AccountController {
     }
 
     @PatchMapping("/{accountId}/visibility")
-    public ResponseEntity<Void> toggleVisibility(@PathVariable Integer accountId) {
+    public ResponseEntity<Void> toggleVisibility(@PathVariable UUID accountId) {
         Account conta = accountRepository.findById(accountId)
             .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
     

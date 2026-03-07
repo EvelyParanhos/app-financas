@@ -16,7 +16,7 @@ public class PartnershipService {
     private final UserRepository userRepository;
     private final PartnershipRepository partnershipRepository;
 
-    public String gerarCodigoConvite(Integer userId) {
+    public String gerarCodigoConvite(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
@@ -31,7 +31,7 @@ public class PartnershipService {
     }
 
     @Transactional
-    public void aceitarConvite(String codigo, Integer convidadoId) {
+    public void aceitarConvite(String codigo, UUID convidadoId) {
         User anfitriao = userRepository.findByInviteCode(codigo)
                 .orElseThrow(() -> new RuntimeException("Código inválido ou inexistente"));
 

@@ -1,5 +1,6 @@
 package com.evely.financas.controller;
 
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,13 +18,13 @@ public class PartnershipController {
     private final PartnershipService partnershipService;
 
     @PostMapping("/invite/{userId}")
-    public ResponseEntity<String> gerarConvite(@PathVariable Integer userId) {
+    public ResponseEntity<String> gerarConvite(@PathVariable UUID userId) {
         String codigo = partnershipService.gerarCodigoConvite(userId);
         return ResponseEntity.ok(codigo);
     }
 
     @PostMapping("/accept")
-    public ResponseEntity<String> aceitarConvite(@RequestParam String code, @RequestParam Integer userId) {
+    public ResponseEntity<String> aceitarConvite(@RequestParam String code, @RequestParam UUID userId) {
         partnershipService.aceitarConvite(code, userId);
         return ResponseEntity.ok("Conexão estabelecida com sucesso! O núcleo familiar foi criado.");
     }
