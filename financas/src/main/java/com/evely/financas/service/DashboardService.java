@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import com.evely.financas.dto.DashboardDTO;
 import com.evely.financas.enums.AccountType;
@@ -22,7 +23,7 @@ public class DashboardService {
     private final AccountRepository accountRepository;
     private final SnapshotRepository snapshotRepository;
 
-    public DashboardDTO getResumoIndividual (Integer userId) {
+    public DashboardDTO getResumoIndividual (UUID userId) {
         LocalDate hoje = LocalDate.now();
         LocalDate inicioMes = hoje.with(TemporalAdjusters.firstDayOfMonth());
         LocalDate fimMes = hoje.with(TemporalAdjusters.lastDayOfMonth());
@@ -44,7 +45,7 @@ public class DashboardService {
         return new DashboardDTO(totalDebts, currentBalance, leftover, false);
     }
 
-    public DashboardDTO getResumoCasal(Integer idUser1, Integer idUser2) {
+    public DashboardDTO getResumoCasal(UUID idUser1, UUID idUser2) {
         DashboardDTO d1 = getResumoIndividual(idUser1);
         DashboardDTO d2 = getResumoIndividual(idUser2);
 
@@ -56,7 +57,7 @@ public class DashboardService {
         );
     } 
 
-    public DashboardDTO getResumoCompleto(Integer userId, int mes, int ano, boolean incluirSimulacoes) {
+    public DashboardDTO getResumoCompleto(UUID userId, int mes, int ano, boolean incluirSimulacoes) {
         LocalDate inicioMes = LocalDate.of(ano, mes, 1);
         LocalDate fimMes = inicioMes.with(TemporalAdjusters.lastDayOfMonth());
 

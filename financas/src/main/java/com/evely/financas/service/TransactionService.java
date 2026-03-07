@@ -3,6 +3,7 @@ package com.evely.financas.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import com.evely.financas.repository.TransactionRepository;
 import com.evely.financas.repository.UserRepository;
@@ -78,7 +79,7 @@ public class TransactionService {
         snapshotRepository.save(novoSnapshot);
     }
 
-    public void excluir(Integer id) {
+    public void excluir(UUID id) {
     Transaction transaction = transactionRepository.findById(id)
         .orElseThrow(() -> new RuntimeException("Transação não encontrada!"));
     transactionRepository.delete(transaction);
@@ -94,7 +95,7 @@ public class TransactionService {
     }
 
     @Transactional
-    public void efetivarSimulacao(Integer transactionId) {
+    public void efetivarSimulacao(UUID transactionId) {
         Transaction transacao = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new RuntimeException("Simulação não encontrada!"));
 

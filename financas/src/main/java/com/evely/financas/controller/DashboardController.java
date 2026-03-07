@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.evely.financas.dto.DashboardDTO;
 import com.evely.financas.service.DashboardService;
 import lombok.RequiredArgsConstructor;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,12 +19,12 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/individual/{userId}")
-    public ResponseEntity <DashboardDTO> getResumo(@PathVariable Integer id) {
+    public ResponseEntity <DashboardDTO> getResumo(@PathVariable UUID id) {
         return ResponseEntity.ok(dashboardService.getResumoIndividual(id));
     }
     
     @GetMapping("/casal")
-    public ResponseEntity <DashboardDTO> getResumoCasal(@RequestParam Integer id1, @RequestParam Integer id2) {
+    public ResponseEntity <DashboardDTO> getResumoCasal(@RequestParam UUID id1, @RequestParam UUID id2) {
         return ResponseEntity.ok(dashboardService.getResumoCasal(id1, id2));
     }
 

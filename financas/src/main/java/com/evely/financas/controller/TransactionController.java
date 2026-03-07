@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.evely.financas.model.Transaction;
 import com.evely.financas.service.TransactionService;
 import lombok.RequiredArgsConstructor;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -31,13 +32,13 @@ public class TransactionController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> excluir (@PathVariable Integer id) {
+    public ResponseEntity<Void> excluir (@PathVariable UUID id) {
         transactionService.excluir(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/efetivar/{simulationId}")
-    public ResponseEntity<String> efetivarSimulacao (@PathVariable Integer simulationId) {
+    public ResponseEntity<String> efetivarSimulacao (@PathVariable UUID simulationId) {
         transactionService.efetivarSimulacao(simulationId);
 
         return ResponseEntity.status(200).body("Perfeito! Deixou de ser uma simulação e passou a ser uma transação real! Seu dashboard atualizou!");

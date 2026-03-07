@@ -7,6 +7,7 @@ import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.service.AccountService;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -38,13 +39,13 @@ public class AccountController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> excluir(@PathVariable Integer id) {
+    public ResponseEntity<Void> excluir(@PathVariable UUID id) {
         accountService.excluir(id);
         return ResponseEntity.noContent().build(); 
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity<Account> editar(@PathVariable Integer id, @RequestBody Account account) {
+    public ResponseEntity<Account> editar(@PathVariable UUID id, @RequestBody Account account) {
         Account atualizada = accountService.editar(id, account);
         return ResponseEntity.ok(atualizada);
     }

@@ -2,6 +2,7 @@ package com.evely.financas.model;
 
 import java.time.LocalDateTime;
 
+import java.util.UUID;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -17,9 +18,9 @@ import lombok.*;
 @AllArgsConstructor
 public class User {
     @Id
-    @GeneratedValue (strategy = GenerationType.IDENTITY)
-    @Column (name = "id_user")
-    private Integer Id;
+    @GeneratedValue (strategy = GenerationType.UUID)
+    @Column (name = "id_user", updatable = false, nullable = false)
+    private UUID Id;
 
     private String name;
 

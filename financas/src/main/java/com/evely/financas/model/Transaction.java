@@ -5,9 +5,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-
+import java.util.UUID;
 import org.hibernate.annotations.CreationTimestamp;
-
 import com.evely.financas.enums.TransactionType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -30,9 +29,9 @@ import lombok.*;
 @AllArgsConstructor
 public class Transaction {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column (name = "id_transaction")
-    private Integer id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column (name = "id_transaction", updatable = false, nullable = false)
+    private UUID id;
 
     private String description;
 

@@ -1,5 +1,6 @@
 package com.evely.financas.model;
 
+import java.util.UUID;
 import com.evely.financas.enums.CategoryType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -18,9 +19,9 @@ import lombok.*;
 @NoArgsConstructor
 public class Category {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column (name = "id_category")
-    private Integer id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column (name = "id_category", updatable = false, nullable = false)
+    private UUID id;
 
     private String name;
 
