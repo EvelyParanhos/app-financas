@@ -3,7 +3,9 @@ package com.evely.financas.controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.evely.financas.model.User;
+import com.evely.financas.service.EmailService;
 import com.evely.financas.service.UserService;
+import com.evely.financas.service.VerificationService;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
 import java.util.UUID;
@@ -21,12 +23,16 @@ import org.springframework.web.bind.annotation.PutMapping;
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+    private final VerificationService verificationService;
+    private final EmailService emailService;
 
     @PostMapping
-    public ResponseEntity <User> salvar(@RequestBody User user) {
-        return ResponseEntity.status(201).body(userService.salvar(user));
+    public ResponseEntity<User> salvar(@RequestBody User user) {   
+        User novoUser = userService.salvar(user);
+        String codigo = verificationService.solicitarNovoCodigo(novoUser.getId());
+        emailService.enviarEmailVerificacao(novoUser.getEmail(), codigo);
+        return ResponseEntity.status(201).body(novoUser);
     }
-
     @GetMapping
     public ResponseEntity<List<User>> listarTodos () {
         return ResponseEntity.ok(userService.listarTodos());
