@@ -3,6 +3,8 @@ package com.evely.financas.model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.evely.financas.enums.InstallmentStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -24,14 +26,17 @@ import lombok.*;
 public class Installment {
     @Id
     @GeneratedValue (strategy = GenerationType.UUID)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column (name = "id", updatable = false, nullable = false)
     private UUID id;
 
     @ManyToOne
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @JoinColumn (name = "transaction_id")
     private Transaction transaction;
 
     @ManyToOne
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @JoinColumn (name = "payer_id")
     private User payer;
 

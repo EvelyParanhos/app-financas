@@ -1,9 +1,9 @@
 package com.evely.financas.model;
 
 import java.time.LocalDateTime;
-
 import org.hibernate.annotations.CreationTimestamp;
-
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -25,13 +25,16 @@ public class Partnership {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Integer id;
 
     @ManyToOne
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @JoinColumn(name = "user_a_id", nullable = false)
     private User userA;
 
     @ManyToOne
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @JoinColumn(name = "user_b_id", nullable = false)
     private User userB;
 

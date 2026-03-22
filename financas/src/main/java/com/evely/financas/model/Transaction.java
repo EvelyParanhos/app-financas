@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.evely.financas.enums.TransactionType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -31,6 +33,7 @@ public class Transaction {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column (name = "id", updatable = false, nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID id;
 
     private String description;
@@ -43,10 +46,12 @@ public class Transaction {
 
     @ManyToOne
     @JoinColumn (name = "account_id")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Account account;
 
     @ManyToOne
     @JoinColumn (name = "category_id")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Category category;
 
     @Enumerated(EnumType.STRING)
@@ -56,10 +61,12 @@ public class Transaction {
     private boolean isSimulation;
 
     @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private List<Installment> installments = new ArrayList<>();
 
     @ManyToOne
     @JoinColumn(name = "destination_account_id")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Account destinationAccount;
 
     @CreationTimestamp 

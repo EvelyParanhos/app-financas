@@ -1,6 +1,8 @@
 package com.evely.financas.model;
 
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.evely.financas.enums.CategoryType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -21,6 +23,7 @@ public class Category {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column (name = "id", updatable = false, nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID id;
 
     private String name;
