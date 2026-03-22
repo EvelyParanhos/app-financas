@@ -2,6 +2,8 @@ package com.evely.financas.model;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import com.evely.financas.enums.TransactionType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -25,6 +27,7 @@ import lombok.NoArgsConstructor;
 public class RecurringTransaction {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column (name = "id", updatable = false, nullable = false)
     private UUID id;
 
@@ -41,10 +44,12 @@ public class RecurringTransaction {
 
     @ManyToOne
     @JoinColumn(name = "account_id")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Account account; 
 
     @ManyToOne
     @JoinColumn(name = "category_id")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Category category;
 
     @Column (name = "is_variable")

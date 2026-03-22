@@ -3,6 +3,8 @@ package com.evely.financas.model;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -24,9 +26,11 @@ public class Snapshot {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column (name = "id", nullable = false, updatable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID id;
 
     @ManyToOne
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @JoinColumn (name = "account_id")
     private Account account;
     
