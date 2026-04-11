@@ -19,8 +19,8 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/individual/{userId}")
-    public ResponseEntity <DashboardDTO> getResumo(@PathVariable UUID id) {
-        return ResponseEntity.ok(dashboardService.getResumoIndividual(id));
+    public ResponseEntity<DashboardDTO> getResumo(@PathVariable UUID userId) {
+        return ResponseEntity.ok(dashboardService.getResumoIndividual(userId));
     }
     
     @GetMapping("/casal")
