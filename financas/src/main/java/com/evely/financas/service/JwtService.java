@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import com.evely.financas.model.User;
 import io.jsonwebtoken.Jwts;
@@ -35,5 +36,11 @@ public class JwtService {
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
+    }
+
+    public User getAuthenticatedUser() {
+    return (User) SecurityContextHolder.getContext()
+            .getAuthentication()
+            .getPrincipal();
     }
 }

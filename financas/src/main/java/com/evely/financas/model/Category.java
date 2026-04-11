@@ -11,6 +11,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.*;
 
@@ -26,6 +28,11 @@ public class Category {
     @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID id;
 
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User owner; 
+
+    private boolean active = true; 
     private String name;
 
     @Enumerated(EnumType.STRING)

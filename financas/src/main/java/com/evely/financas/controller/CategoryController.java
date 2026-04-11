@@ -1,48 +1,43 @@
 package com.evely.financas.controller;
 
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import com.evely.financas.dto.CategoryDTO;
 import com.evely.financas.model.Category;
+import com.evely.financas.model.User;
 import com.evely.financas.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @RestController
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
 public class CategoryController {
+
     private final CategoryService categoryService;
 
     @PostMapping
-    public ResponseEntity<String> salvar (@RequestBody Category category) {
-        categoryService.registrarCategoria(category);
-        return ResponseEntity.status(201).body("Categoria registrada com sucesso!");
+    public ResponseEntity<Category> create(@RequestBody CategoryDTO dto, @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(categoryService.create(dto, user));
     }
 
     @GetMapping
-    public ResponseEntity<List<Category>> listar() {
-        List<Category> lista = categoryService.listarTodas();
+    public ResponseEntity<List<Category>> listar(@AuthenticationPrincipal User user) {
+        List<Category> lista = categoryService.listarMinhas(user);
         return ResponseEntity.ok(lista);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable UUID id) {
-        categoryService.excluir(id);
+    public ResponseEntity<Void> deletar(@PathVariable UUID id, @AuthenticationPrincipal User user) {
+        categoryService.softDelete(id, user);
         return ResponseEntity.noContent().build(); 
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity<Category> editar(@PathVariable UUID id, @RequestBody Category category) {
-        Category atualizada = categoryService.atualizar(id, category);
+    public ResponseEntity<Category> editar(@PathVariable UUID id, @RequestBody CategoryDTO dto, @AuthenticationPrincipal User user) {
+        Category atualizada = categoryService.atualizar(id, dto, user);
         return ResponseEntity.ok(atualizada);
     }
-    
 }
