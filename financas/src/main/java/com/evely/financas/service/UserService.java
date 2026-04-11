@@ -2,6 +2,8 @@ package com.evely.financas.service;
 
 import java.util.List;
 import java.util.UUID;
+
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.User;
@@ -12,11 +14,13 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class UserService {
     private final UserRepository userRepository;
+    private final BCryptPasswordEncoder pe;
 
     public User salvar (User user) {
         if (userRepository.existsByEmail(user.getEmail())) {
             throw new ObjectNotFoundException ("Este e-mail já está cadastrado no sistema!");
         }
+        user.setPassword(pe.encode(user.getPassword()));
         User usuarioSalvo = userRepository.save(user);
         return userRepository.findById(usuarioSalvo.getId()).get();    
     }
