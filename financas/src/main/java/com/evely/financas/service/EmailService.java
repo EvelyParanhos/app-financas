@@ -15,7 +15,7 @@ public class EmailService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom("sistema@financas.com");
         message.setTo(para);
-        message.setSubject("Seu Código de Verificação para juntar os pombinhos");
+        message.setSubject("Seu Código de Verificação para ativar a conta!");
         message.setText("Olá! Seu código de verificação é: " + codigo + 
                         "\nEle expira em 2 minutos. Não compartilhe com ninguém!");
 

@@ -14,6 +14,7 @@ import com.evely.financas.enums.AccountType;
 import com.evely.financas.enums.InstallmentStatus;
 import com.evely.financas.enums.TransactionType;
 import com.evely.financas.enums.UserStatus;
+import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Account;
 import com.evely.financas.model.Installment;
 import com.evely.financas.model.Snapshot;
@@ -33,11 +34,11 @@ public class TransactionService {
     @Transactional
     public Transaction registrarTransacao(Transaction transacao, int totalParcelas, UUID userId) {
         User pagador = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
+                .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado!"));
 
         // Proteção: Só usuários ativos podem registrar gastos reais
         if (!transacao.isSimulation() && !pagador.getStatus().equals(UserStatus.ACTIVE)) {
-            throw new RuntimeException("Sua conta precisa estar ATIVA para registrar gastos reais.");
+            throw new ObjectNotFoundException("Sua conta precisa estar ATIVA para registrar gastos reais.");
         }
 
         BigDecimal valorParcela = transacao.getTotalAmount()
@@ -79,7 +80,7 @@ public class TransactionService {
         String mensagem = (conta.getType() == AccountType.CREDIT_CARD) 
             ? "Cartão recusado: Limite insuficiente!" 
             : "Operação cancelada: Saldo insuficiente!";
-        throw new RuntimeException(mensagem);
+        throw new ObjectNotFoundException(mensagem);
         }
 
         Snapshot novoSnapshot = new Snapshot();
@@ -91,7 +92,7 @@ public class TransactionService {
 
     public void excluir(UUID id) {
     Transaction transaction = transactionRepository.findById(id)
-        .orElseThrow(() -> new RuntimeException("Transação não encontrada!"));
+        .orElseThrow(() -> new ObjectNotFoundException("Transação não encontrada!"));
     transactionRepository.delete(transaction);
     }
 
@@ -107,10 +108,10 @@ public class TransactionService {
     @Transactional
     public void efetivarSimulacao(UUID transactionId) {
         Transaction transacao = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new RuntimeException("Simulação não encontrada!"));
+                .orElseThrow(() -> new ObjectNotFoundException("Simulação não encontrada!"));
 
         if (!transacao.isSimulation()) {
-            throw new RuntimeException("Esta transação já é real!");
+            throw new ObjectNotFoundException("Esta transação já é real!");
         }
 
         // Torna a transação oficial

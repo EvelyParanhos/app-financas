@@ -3,6 +3,7 @@ package com.evely.financas.service;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Category;
 import com.evely.financas.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,7 @@ public class CategoryService {
     
     public Category atualizar(UUID id, Category categoriaAtualizada) {
         Category categoriaExistente = categoryRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Categoria não encontrada com o ID: " + id));
+            .orElseThrow(() -> new ObjectNotFoundException("Categoria não encontrada com o ID: " + id));
 
         categoriaExistente.setName(categoriaAtualizada.getName());
         categoriaExistente.setType(categoriaAtualizada.getType());

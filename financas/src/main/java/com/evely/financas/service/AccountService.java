@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import com.evely.financas.enums.AccountType;
+import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Account;
 import com.evely.financas.model.Snapshot;
 import com.evely.financas.repository.AccountRepository;
@@ -26,7 +27,7 @@ public class AccountService {
         UUID ownerId = account.getOwner().getId();
 
         userRepository.findById(ownerId)
-            .orElseThrow(()->new RuntimeException("Não foi possível criar a conta: Usuário dono não encontrado!"));
+            .orElseThrow(()->new ObjectNotFoundException("Não foi possível criar a conta: Usuário dono não encontrado!"));
         
         if (account.getType() == AccountType.CREDIT_CARD) {
             Snapshot initialSnapshot = new Snapshot();
@@ -51,7 +52,7 @@ public class AccountService {
 
     public Account editar (UUID id, Account accountAtualizada) {
         Account accountExistente = accountRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Conta não encontrada com o ID: " + id));
+            .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada com o ID: " + id));
             
         accountExistente.setName(accountAtualizada.getName());
         accountExistente.setType(accountAtualizada.getType());

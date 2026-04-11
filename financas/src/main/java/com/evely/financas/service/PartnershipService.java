@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Partnership;
 import com.evely.financas.model.User;
 import com.evely.financas.repository.PartnershipRepository;
@@ -18,7 +19,7 @@ public class PartnershipService {
 
     public String gerarCodigoConvite(UUID userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado"));
 
         //Gera um código aleatório de 6 caracteres que vai expirar em 24 horas desde da hora que foi gerado
         String codigo = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
@@ -32,25 +33,23 @@ public class PartnershipService {
 
     @Transactional
     public void aceitarConvite(String codigo, UUID convidadoId) {
-        User anfitriao = userRepository.findByInviteCode(codigo)
-                .orElseThrow(() -> new RuntimeException("Código inválido ou inexistente"));
+            // Busca quem enviou o convite
+        User userA = userRepository.findByInviteCode(codigo)
+                .orElseThrow(() -> new ObjectNotFoundException("Código de convite inválido ou expirado."));
 
-        if (anfitriao.getInviteExpiry().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Este código de convite já expirou!");
-        }
+        // Busca quem está aceitando
+        User userB = userRepository.findById(convidadoId)
+                .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado."));
 
-        if (anfitriao.getId().equals(convidadoId)) {
-            throw new RuntimeException("Você não pode conectar-se consigo mesmo, espertinho!");
-        }
+        // Cria a parceria (O ID será gerado pelo @GeneratedValue da Entity)
+        Partnership partnership = new Partnership();
+        partnership.setUserA(userA);
+        partnership.setUserB(userB);
 
-        Partnership parceria = new Partnership();
-        parceria.setUserA(anfitriao);
-        parceria.setUserB(userRepository.getReferenceById(convidadoId));
-        partnershipRepository.save(parceria);
+        partnershipRepository.save(partnership);
 
-        //limpando o código pra não ser reaproveitado
-        anfitriao.setInviteCode(null);
-        anfitriao.setInviteExpiry(null);
-        userRepository.save(anfitriao);
+        // Limpa o código para não ser usado de novo
+        userA.setInviteCode(null);
+        userRepository.save(userA);
     }
 }

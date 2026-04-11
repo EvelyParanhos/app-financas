@@ -3,6 +3,8 @@ package com.evely.financas.controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.evely.financas.enums.UserStatus;
 import com.evely.financas.model.User;
 import com.evely.financas.service.EmailService;
 import com.evely.financas.service.UserService;
@@ -31,6 +33,7 @@ public class UserController {
     public ResponseEntity <User> salvar(@RequestBody User user) {  
         User novoUser = userService.salvar(user);
         String codigo = verificationService.solicitarNovoCodigo(user.getId());
+        novoUser.setStatus(UserStatus.PENDING);
         emailService.enviarEmailVerificacao(user.getEmail(), codigo);
         return ResponseEntity.status(201).body(novoUser);
 

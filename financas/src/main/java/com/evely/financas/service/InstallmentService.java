@@ -1,6 +1,7 @@
 package com.evely.financas.service;
 
 import com.evely.financas.enums.InstallmentStatus;
+import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Installment;
 import com.evely.financas.model.User;
 import com.evely.financas.repository.InstallmentRepository;
@@ -20,7 +21,7 @@ public class InstallmentService {
 
     public Installment pagarParcela(UUID id) {
         Installment parcela = installmentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Parcela não encontrada!"));
+                .orElseThrow(() -> new ObjectNotFoundException("Parcela não encontrada!"));
         parcela.setStatus(InstallmentStatus.PAID);
         return installmentRepository.save(parcela);
     }
@@ -28,15 +29,15 @@ public class InstallmentService {
     @Transactional
     public void dividirParcela (UUID installmentId, BigDecimal valorPayer1, UUID idPayer2) {
         Installment original = installmentRepository.findById(installmentId)
-            .orElseThrow(() -> new RuntimeException("Parcela não encontrada!"));
+            .orElseThrow(() -> new ObjectNotFoundException("Parcela não encontrada!"));
         
         BigDecimal valorTotalOriginal = original.getAmount();
 
         User payer2 = userRepository.findById(idPayer2)
-            .orElseThrow(()-> new RuntimeException("Segundo pagador não encontrado!"));
+            .orElseThrow(()-> new ObjectNotFoundException("Segundo pagador não encontrado!"));
 
         if (valorPayer1.compareTo(valorTotalOriginal) >= 0) {
-            throw new RuntimeException("O valor da divisão deve ser menor que o valor total da parcela!");
+            throw new ObjectNotFoundException("O valor da divisão deve ser menor que o valor total da parcela!");
         }
 
         BigDecimal valorPayer2 = valorTotalOriginal.subtract(valorPayer1);
@@ -56,9 +57,9 @@ public class InstallmentService {
 
     public void assumirParcelaTotal(UUID installmentId, UUID novoPayerId) {
         Installment parcela = installmentRepository.findById(installmentId)
-                .orElseThrow(() -> new RuntimeException("Parcela não encontrada!"));
+                .orElseThrow(() -> new ObjectNotFoundException("Parcela não encontrada!"));
         User novoPagador = userRepository.findById(novoPayerId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado!"));
+                .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado!"));
         parcela.setPayer(novoPagador);
         installmentRepository.save(parcela);
     }

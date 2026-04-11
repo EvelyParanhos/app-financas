@@ -13,6 +13,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 @Entity
@@ -32,6 +34,8 @@ public class User {
     @Column (name = "telegram_id")
     private String telegramId;
 
+    @Email(message = "Por favor, insira um e-mail válido.")
+    @NotBlank(message = "O e-mail é obrigatório.")
     private String email;
 
     private String password;

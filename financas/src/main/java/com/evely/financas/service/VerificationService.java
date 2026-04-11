@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import com.evely.financas.enums.UserStatus;
+import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -18,16 +19,16 @@ public class VerificationService {
     @Transactional
     public void validarCodigo(UUID userId, String codigoInformado) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado"));
 
         // 1. Verificar se está bloqueado
         if (user.getStatus() == UserStatus.BLOCKED) {
-            throw new RuntimeException("Conta bloqueada por excesso de tentativas. Contate o suporte.");
+            throw new ObjectNotFoundException("Conta bloqueada por excesso de tentativas. Contate o suporte.");
         }
 
         // 2. Verificar expiração (2 minutos)
         if (user.getVerificationExpiry().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("O código expirou! Solicite um novo.");
+            throw new ObjectNotFoundException("O código expirou! Solicite um novo.");
         }
 
         // 3. Validar código e tentativas
@@ -40,9 +41,9 @@ public class VerificationService {
             
             if (user.getVerificationAttempts() >= 5) {
                 user.setStatus(UserStatus.BLOCKED);
-                throw new RuntimeException("Limite de tentativas excedido! Conta bloqueada.");
+                throw new ObjectNotFoundException("Limite de tentativas excedido! Conta bloqueada.");
             }
-            throw new RuntimeException("Código incorreto! Tentativas: " + user.getVerificationAttempts() + "/5");
+            throw new ObjectNotFoundException("Código incorreto! Tentativas: " + user.getVerificationAttempts() + "/5");
         }
         userRepository.save(user);
     }
@@ -54,7 +55,7 @@ public class VerificationService {
         // 4. Trava de 30 segundos para reenvio
         if (user.getLastResendAt() != null && 
             user.getLastResendAt().plusSeconds(30).isAfter(LocalDateTime.now())) {
-            throw new RuntimeException("Aguarde 30 segundos para solicitar um novo código.");
+            throw new ObjectNotFoundException("Aguarde 30 segundos para solicitar um novo código.");
         }
 
         // Gera novo código de 6 dígitos
