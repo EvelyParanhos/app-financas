@@ -3,11 +3,8 @@ package com.evely.financas.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import com.evely.financas.repository.TransactionRepository;
-import com.evely.financas.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import com.evely.financas.enums.AccountType;
@@ -16,112 +13,168 @@ import com.evely.financas.enums.TransactionType;
 import com.evely.financas.enums.UserStatus;
 import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Account;
+import com.evely.financas.model.CreditCardInvoice;
 import com.evely.financas.model.Installment;
-import com.evely.financas.model.Snapshot;
 import com.evely.financas.model.Transaction;
 import com.evely.financas.model.User;
 import com.evely.financas.repository.InstallmentRepository;
-import com.evely.financas.repository.SnapshotRepository; 
+import com.evely.financas.repository.TransactionRepository;
+import com.evely.financas.repository.UserRepository;
 
 @Service
 @RequiredArgsConstructor
 public class TransactionService {
+
     private final TransactionRepository transactionRepository;
     private final InstallmentRepository installmentRepository;
     private final UserRepository userRepository;
-    private final SnapshotRepository snapshotRepository;
+    private final BalanceService balanceService;
+    private final CreditCardInvoiceService creditCardInvoiceService;
 
     @Transactional
     public Transaction registrarTransacao(Transaction transacao, int totalParcelas, UUID userId) {
         User pagador = userRepository.findById(userId)
-                .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado!"));
+            .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado!"));
 
-        // Proteção: Só usuários ativos podem registrar gastos reais
+        // Apenas usuários ativos podem registrar transações reais
         if (!transacao.isSimulation() && !pagador.getStatus().equals(UserStatus.ACTIVE)) {
-            throw new ObjectNotFoundException("Sua conta precisa estar ATIVA para registrar gastos reais.");
+            throw new RuntimeException("Sua conta precisa estar ATIVA para registrar gastos reais.");
         }
 
-        BigDecimal valorParcela = transacao.getTotalAmount()
-                .divide(BigDecimal.valueOf(totalParcelas), 2, RoundingMode.HALF_UP);
+        // Validação antecipada para TRANSFER
+        if (transacao.getType() == TransactionType.TRANSFER
+                && transacao.getDestinationAccount() == null) {
+            throw new RuntimeException("Transferência exige uma conta de destino.");
+        }
 
-        for (int i = 1; i <= totalParcelas; i++) {
+        boolean ehCartao = transacao.getAccount().getType() == AccountType.CREDIT_CARD;
+
+        BigDecimal valorParcela = transacao.getTotalAmount()
+            .divide(BigDecimal.valueOf(totalParcelas), 2, RoundingMode.HALF_UP);
+
+        // Resolve mês base da primeira parcela
+        LocalDate dataBase = transacao.getPurchaseDate() != null
+            ? transacao.getPurchaseDate()
+            : LocalDate.now();
+
+        LocalDate mesBase = ehCartao
+            ? creditCardInvoiceService
+                .resolverMesDaPrimeiraParcela(transacao.getAccount(), dataBase)
+                .withDayOfMonth(1)
+            : dataBase;
+
+        for (int i = 0; i < totalParcelas; i++) {
             Installment parcela = new Installment();
-            parcela.setInstallmentNumber(i);
+            parcela.setInstallmentNumber(i + 1);
             parcela.setStatus(InstallmentStatus.PENDING);
             parcela.setTransaction(transacao);
             parcela.setAmount(valorParcela);
-            
-            LocalDate dataBase = transacao.getPurchaseDate() != null ? transacao.getPurchaseDate() : LocalDate.now();
-            parcela.setDueDate(dataBase.plusMonths(i - 1)); 
-            
             parcela.setPayer(pagador);
+
+            if (ehCartao) {
+                LocalDate mesDaParcela = mesBase.plusMonths(i);
+                parcela.setDueDate(
+                    mesDaParcela.withDayOfMonth(transacao.getAccount().getDueDay())
+                );
+
+                // Fatura só é criada para transações reais
+                if (!transacao.isSimulation()) {
+                    CreditCardInvoice invoice = creditCardInvoiceService.buscarOuCriarFatura(
+                        transacao.getAccount(),
+                        mesDaParcela.getMonthValue(),
+                        mesDaParcela.getYear()
+                    );
+                    creditCardInvoiceService.adicionarValorNaFatura(invoice, valorParcela);
+                    parcela.setInvoice(invoice);
+                }
+            } else {
+                parcela.setDueDate(mesBase.plusMonths(i));
+            }
+
             transacao.getInstallments().add(parcela);
         }
 
         Transaction transacaoSalva = transactionRepository.save(transacao);
 
+        // Movimentação de saldo — apenas transações reais
         if (!transacaoSalva.isSimulation()) {
-            atualizarSaldoAutomatico(transacaoSalva);
+            if (ehCartao) {
+                // Cartão: baixa o limite total imediatamente
+                balanceService.baixarSaldo(
+                    transacaoSalva.getAccount(),
+                    transacaoSalva.getTotalAmount()
+                );
+            } else {
+                atualizarSaldoAutomatico(transacaoSalva);
+            }
         }
-        
+
         return transacaoSalva;
-    }
-
-    private void processarMovimentacao(Account conta, BigDecimal valor, String direcao) {
-        BigDecimal saldoAnterior = snapshotRepository.findFirstByAccountOrderBySnapshotDateDesc(conta)
-            .map(Snapshot::getAmount)
-            .orElse(BigDecimal.ZERO);
-
-        BigDecimal novoSaldo = direcao.equals("SAIDA") 
-        ? saldoAnterior.subtract(valor) 
-        : saldoAnterior.add(valor);
-
-        if (novoSaldo.compareTo(BigDecimal.ZERO) < 0) {
-        String mensagem = (conta.getType() == AccountType.CREDIT_CARD) 
-            ? "Cartão recusado: Limite insuficiente!" 
-            : "Operação cancelada: Saldo insuficiente!";
-        throw new ObjectNotFoundException(mensagem);
-        }
-
-        Snapshot novoSnapshot = new Snapshot();
-        novoSnapshot.setAccount(conta);
-        novoSnapshot.setAmount(novoSaldo);
-        novoSnapshot.setSnapshotDate(LocalDateTime.now());
-        snapshotRepository.save(novoSnapshot);
-    }
-
-    public void excluir(UUID id) {
-    Transaction transaction = transactionRepository.findById(id)
-        .orElseThrow(() -> new ObjectNotFoundException("Transação não encontrada!"));
-    transactionRepository.delete(transaction);
-    }
-
-    private void atualizarSaldoAutomatico(Transaction transacao) {
-        String direcaoOrigem = (transacao.getType() == TransactionType.INCOME) ? "ENTRADA" : "SAIDA";
-        processarMovimentacao(transacao.getAccount(), transacao.getTotalAmount(), direcaoOrigem);
-
-        if (transacao.getType() == TransactionType.TRANSFER && transacao.getDestinationAccount() != null) {
-            processarMovimentacao(transacao.getDestinationAccount(), transacao.getTotalAmount(), "ENTRADA");
-        }
     }
 
     @Transactional
     public void efetivarSimulacao(UUID transactionId) {
         Transaction transacao = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new ObjectNotFoundException("Simulação não encontrada!"));
+            .orElseThrow(() -> new ObjectNotFoundException("Simulação não encontrada!"));
 
         if (!transacao.isSimulation()) {
-            throw new ObjectNotFoundException("Esta transação já é real!");
+            throw new RuntimeException("Esta transação já é real!");
         }
+
+        boolean ehCartao = transacao.getAccount().getType() == AccountType.CREDIT_CARD;
 
         // Torna a transação oficial
         transacao.setSimulation(false);
-        
-        // Aciona o gatilho de saldo (Snapshot) 
-        if (transacao.getAccount().getType() != AccountType.CREDIT_CARD) {
+
+        if (ehCartao) {
+            // Valida se o limite ainda comporta o valor (pode ter mudado desde a simulação)
+            balanceService.validarSaldo(transacao.getAccount(), transacao.getTotalAmount());
+
+            // Cria as faturas e vincula as parcelas — o que não foi feito na simulação
+            for (Installment parcela : transacao.getInstallments()) {
+                LocalDate mesDaParcela = parcela.getDueDate().withDayOfMonth(1);
+                CreditCardInvoice invoice = creditCardInvoiceService.buscarOuCriarFatura(
+                    transacao.getAccount(),
+                    mesDaParcela.getMonthValue(),
+                    mesDaParcela.getYear()
+                );
+                creditCardInvoiceService.adicionarValorNaFatura(invoice, parcela.getAmount());
+                parcela.setInvoice(invoice);
+                installmentRepository.save(parcela);
+            }
+
+            // Baixa o limite após criar as faturas
+            balanceService.baixarSaldo(
+                transacao.getAccount(),
+                transacao.getTotalAmount()
+            );
+        } else {
             atualizarSaldoAutomatico(transacao);
         }
 
         transactionRepository.save(transacao);
+    }
+
+    public void excluir(UUID id) {
+        Transaction transaction = transactionRepository.findById(id)
+            .orElseThrow(() -> new ObjectNotFoundException("Transação não encontrada!"));
+        transactionRepository.delete(transaction);
+    }
+    
+    private void atualizarSaldoAutomatico(Transaction transacao) {
+        switch (transacao.getType()) {
+            case INCOME -> balanceService.subirSaldo(
+                transacao.getAccount(), transacao.getTotalAmount()
+            );
+            case TRANSFER -> balanceService.transferir(
+                transacao.getAccount(),
+                transacao.getDestinationAccount(),
+                transacao.getTotalAmount()
+            );
+            // EXPENSE, LOAN_OUT, INTERNAL_REPAYMENT — todos baixam saldo
+            default -> balanceService.baixarSaldo(
+                transacao.getAccount(), transacao.getTotalAmount()
+            );
+        }
     }
 }

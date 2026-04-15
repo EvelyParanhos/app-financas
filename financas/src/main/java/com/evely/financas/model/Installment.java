@@ -51,4 +51,9 @@ public class Installment {
     @Enumerated (EnumType.STRING)
     private InstallmentStatus status;
 
+    @ManyToOne
+    @JoinColumn(name = "invoice_id")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    private CreditCardInvoice invoice;
+
 }

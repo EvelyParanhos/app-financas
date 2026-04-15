@@ -1,5 +1,5 @@
 package com.evely.financas.enums;
 
 public enum TransactionType {
-    EXPENSE, INCOME, TRANSFER, LOAN_OUT
+    EXPENSE, INCOME, TRANSFER, LOAN_OUT, INTERNAL_REPAYMENT 
 }

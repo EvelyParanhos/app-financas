@@ -9,13 +9,16 @@ import com.evely.financas.model.Transaction;
 import com.evely.financas.repository.RecurringTransactionRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RecurringTransactionService {
 
     private final RecurringTransactionRepository recurringRepository;
     private final TransactionService transactionService;
+    private final CreditCardInvoiceService invoiceService;
 
     @Scheduled(cron = "0 0 1 * * ?")
     @Transactional
@@ -36,5 +39,12 @@ public class RecurringTransactionService {
 
             transactionService.registrarTransacao(novaTransacao, 1, molde.getAccount().getOwner().getId());
         }
+    }
+
+    @Scheduled(cron = "0 0 0 * * ?")
+    @Transactional
+    public void fecharFaturasDoMes() {
+        invoiceService.fecharFaturasVencidas();
+        log.info("Verificação de fechamento de faturas concluída.");
     }
 }
