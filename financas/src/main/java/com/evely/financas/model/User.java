@@ -1,18 +1,15 @@
 package com.evely.financas.model;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 import com.evely.financas.enums.UserStatus;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
@@ -22,16 +19,17 @@ import lombok.*;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class User {
+public class User implements UserDetails {
+
     @Id
-    @GeneratedValue (strategy = GenerationType.UUID)
-    @Column (name = "id", updatable = false, nullable = false)
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", updatable = false, nullable = false)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID id;
 
     private String name;
 
-    @Column (name = "telegram_id")
+    @Column(name = "telegram_id")
     private String telegramId;
 
     @Email(message = "Por favor, insira um e-mail válido.")
@@ -43,23 +41,58 @@ public class User {
     @Enumerated(EnumType.STRING)
     private UserStatus status;
 
-    @Column (name = "verification_code")
+    @Column(name = "verification_code")
     private String verificationCode;
 
-    @Column (name = "verification_attempts")
+    @Column(name = "verification_attempts")
     private Integer verificationAttempts;
 
-    @Column (name = "verification_expiry")
+    @Column(name = "verification_expiry")
     private LocalDateTime verificationExpiry;
 
-    @Column (name = "last_resend_at")
+    @Column(name = "last_resend_at")
     private LocalDateTime lastResendAt;
 
-    
-    @Column (name = "invite_expiry")
+    @Column(name = "invite_expiry")
     private LocalDateTime inviteExpiry;
-    
 
     @Column(name = "invite_code", unique = true)
     private String inviteCode;
+
+    // -------------------------------------------------------------------------
+    // UserDetails — Spring Security
+    // -------------------------------------------------------------------------
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        // Sem roles por enquanto — lista vazia é válida e segura
+        return List.of();
+    }
+
+    @Override
+    public String getUsername() {
+        return this.email;
+    }
+
+    // Conta só é válida se estiver ATIVA
+    @Override
+    public boolean isAccountNonLocked() {
+        return this.status != UserStatus.BLOCKED;
+    }
+
+    // Usuário só pode autenticar se a conta estiver ativa
+    @Override
+    public boolean isEnabled() {
+        return this.status == UserStatus.ACTIVE;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
 }

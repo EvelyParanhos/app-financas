@@ -9,4 +9,6 @@ import com.evely.financas.model.Account;
 @Repository
 public interface AccountRepository extends JpaRepository <Account, UUID> {
     List<Account> findByOwnerId (UUID userId);
+
+    List<Account> findByOwnerIdAndSharedTrue(UUID userId);
 }

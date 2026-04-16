@@ -10,4 +10,6 @@ import java.util.List;
 @Repository
 public interface RecurringTransactionRepository extends JpaRepository <RecurringTransaction, UUID> {
     List<RecurringTransaction> findByDayOfMonth(int dayOfMonth);
+
+    List<RecurringTransaction> findByAccountOwnerId(UUID userId);
 }

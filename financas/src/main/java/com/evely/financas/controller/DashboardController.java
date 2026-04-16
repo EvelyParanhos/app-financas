@@ -1,32 +1,44 @@
 package com.evely.financas.controller;
 
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import java.time.LocalDate;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 import com.evely.financas.dto.DashboardDTO;
+import com.evely.financas.model.User;
 import com.evely.financas.service.DashboardService;
 import lombok.RequiredArgsConstructor;
-import java.util.UUID;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-
 
 @RestController
 @RequestMapping("/api/dashboard")
 @RequiredArgsConstructor
 public class DashboardController {
+
     private final DashboardService dashboardService;
 
-    @GetMapping("/individual/{userId}")
-    public ResponseEntity<DashboardDTO> getResumo(@PathVariable UUID userId) {
-        return ResponseEntity.ok(dashboardService.getResumoIndividual(userId));
-    }
-    
-    @GetMapping("/casal")
-    public ResponseEntity <DashboardDTO> getResumoCasal(@RequestParam UUID id1, @RequestParam UUID id2) {
-        return ResponseEntity.ok(dashboardService.getResumoCasal(id1, id2));
+    // Dashboard individual — mês/ano opcionais, padrão é o mês atual
+    @GetMapping
+    public ResponseEntity<DashboardDTO> getDashboard(
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
+            @AuthenticationPrincipal User user) {
+
+        int m = month != null ? month : LocalDate.now().getMonthValue();
+        int y = year != null ? year : LocalDate.now().getYear();
+
+        return ResponseEntity.ok(dashboardService.getDashboard(user.getId(), m, y));
     }
 
-    
+    // Dashboard do casal
+    @GetMapping("/casal")
+    public ResponseEntity<DashboardDTO> getDashboardCasal(
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
+            @AuthenticationPrincipal User user) {
+
+        int m = month != null ? month : LocalDate.now().getMonthValue();
+        int y = year != null ? year : LocalDate.now().getYear();
+
+        return ResponseEntity.ok(dashboardService.getDashboardCasal(user.getId(), m, y));
+    }
 }
