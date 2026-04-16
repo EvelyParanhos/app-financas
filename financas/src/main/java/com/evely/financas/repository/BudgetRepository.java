@@ -52,7 +52,6 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
         AND t.isSimulation = false
         AND MONTH(i.dueDate) = :month
         AND YEAR(i.dueDate) = :year
-        AND i.status = 'PENDING'
     """)
     java.math.BigDecimal calcularGastoPorCategoria(
         @Param("userId") UUID userId,
