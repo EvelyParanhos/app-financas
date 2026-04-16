@@ -78,6 +78,40 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
         @Param("fim") LocalDate fim
     );
 
+    
+    @Query("""
+        SELECT COALESCE(SUM(i.amount), 0)
+        FROM Installment i
+        JOIN i.transaction t
+        WHERE i.payer.id = :userId
+        AND i.status = 'PENDING'
+        AND i.dueDate BETWEEN :inicio AND :fim
+        AND t.isSimulation = false
+        AND t.account.shared = true
+    """)
+    BigDecimal somarDividasComFiltroEContaShared(
+        @Param("userId") UUID userId,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim
+    );
+    
+    @Query("""
+        SELECT i FROM Installment i
+        JOIN FETCH i.transaction t
+        LEFT JOIN FETCH t.category
+        LEFT JOIN FETCH i.payer
+        WHERE i.payer.id = :partnerId
+        AND t.account.shared = true
+        AND i.dueDate BETWEEN :inicio AND :fim
+        AND i.status = 'PENDING'
+        ORDER BY i.dueDate ASC
+    """)
+    List<Installment> findPendingSharedByPartnerAndPeriod(
+        @Param("partnerId") UUID partnerId,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim
+    );
+
     @Query("""
         SELECT COUNT(i) > 0 FROM Installment i
         WHERE i.transaction.id = :transactionId

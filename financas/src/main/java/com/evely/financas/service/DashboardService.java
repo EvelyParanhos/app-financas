@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.springframework.stereotype.Service;
 import com.evely.financas.dto.*;
 import com.evely.financas.enums.AccountType;
@@ -141,7 +143,6 @@ public class DashboardService {
     // =========================================================
 
     public DashboardDTO getDashboardCasal(UUID userId, int month, int year) {
-        // Busca o parceiro — valida que existe parceria
         Partnership partnership = partnershipRepository.findByUserId(userId)
             .orElseThrow(() -> new RuntimeException("Nenhuma conexão encontrada."));
 
@@ -149,29 +150,60 @@ public class DashboardService {
             ? partnership.getUserB().getId()
             : partnership.getUserA().getId();
 
-        DashboardDTO meu = getDashboard(userId, month, year);
-        DashboardDTO parceiro = getDashboard(partnerId, month, year);
+        LocalDate inicio = LocalDate.of(year, month, 1);
+        LocalDate fim = inicio.with(TemporalAdjusters.lastDayOfMonth());
 
-        // Visão consolidada — apenas contas marcadas como shared
+        // Saldo consolidado — apenas contas marcadas como shared de ambos
         BigDecimal saldoCompartilhado = calcularSaldoCompartilhado(userId, partnerId);
 
-        // Parcelas visíveis do parceiro (shared=true nas contas)
-        List<InstallmentItemDTO> parcelasParceiro = parceiro.getInstallmentsDueThisMonth()
-            .stream()
-            .filter(i -> true) // filtro de visibilidade aplicado na query abaixo
+        // Total comprometido do usuário (todas as contas)
+        BigDecimal committedUsuario = installmentRepository.somarDividasComFiltro(
+            userId, inicio, fim, false
+        );
+        if (committedUsuario == null) committedUsuario = BigDecimal.ZERO;
+
+        // Total comprometido do parceiro — apenas contas shared
+        BigDecimal committedParceiro = installmentRepository
+            .somarDividasComFiltroEContaShared(partnerId, inicio, fim);
+        if (committedParceiro == null) committedParceiro = BigDecimal.ZERO;
+
+        BigDecimal totalCommitted = committedUsuario.add(committedParceiro);
+        BigDecimal leftover = saldoCompartilhado.subtract(totalCommitted);
+
+        // Total a receber — soma dos dois
+        BigDecimal toReceive = loanRepository.totalAReceber(userId);
+        if (toReceive == null) toReceive = BigDecimal.ZERO;
+        BigDecimal toReceiveParceiro = loanRepository.totalAReceber(partnerId);
+        if (toReceiveParceiro == null) toReceiveParceiro = BigDecimal.ZERO;
+
+        // Faturas do usuário logado (cada um vê só as suas)
+        List<InvoiceSummaryDTO> invoices = buildInvoiceSummaries(userId);
+
+        // Parcelas do mês: as do usuário + as shared do parceiro
+        List<Installment> parcelasUsuario = installmentRepository
+            .findPendingWithDetailsByUserAndPeriod(userId, inicio, fim);
+
+        List<Installment> parcelasParceiro = installmentRepository
+            .findPendingSharedByPartnerAndPeriod(partnerId, inicio, fim);
+
+        List<InstallmentItemDTO> installmentItems = Stream
+            .concat(parcelasUsuario.stream(), parcelasParceiro.stream())
+            .map(this::toInstallmentItem)
             .toList();
+
+        // Budgets e projeção do usuário logado
+        List<BudgetStatusDTO> budgets = budgetService.getStatusDoMes(userId, month, year);
+        List<MonthProjectionDTO> projection = buildProjection(userId, month, year);
 
         return new DashboardDTO(
             saldoCompartilhado,
-            meu.getCommittedAmount().add(parceiro.getCommittedAmount()),
-            saldoCompartilhado.subtract(
-                meu.getCommittedAmount().add(parceiro.getCommittedAmount())
-            ),
-            meu.getTotalToReceive().add(parceiro.getTotalToReceive()),
-            meu.getPendingInvoices(), // cada um vê suas próprias faturas
-            parcelasParceiro,
-            meu.getBudgetStatus(),
-            meu.getProjection(),
+            totalCommitted,
+            leftover,
+            toReceive.add(toReceiveParceiro),
+            invoices,
+            installmentItems,
+            budgets,
+            projection,
             true
         );
     }
