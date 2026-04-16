@@ -79,6 +79,13 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
     );
 
     @Query("""
+        SELECT COUNT(i) > 0 FROM Installment i
+        WHERE i.transaction.id = :transactionId
+        AND i.status = 'PAID'
+    """)
+    boolean existeParcellaPagaParaTransacao(@Param("transactionId") UUID transactionId);
+
+    @Query("""
         SELECT COALESCE(SUM(i.amount), 0)
         FROM Installment i
         JOIN i.transaction t

@@ -17,9 +17,11 @@ import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.CreditCardInvoiceRepository;
 import com.evely.financas.repository.SnapshotRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CreditCardInvoiceService {
 
     private final CreditCardInvoiceRepository invoiceRepository;
@@ -100,16 +102,15 @@ public class CreditCardInvoiceService {
 
     @Transactional
     public void fecharFaturasVencidas() {
-        List<CreditCardInvoice> abertas = invoiceRepository
-            .findByAccountIdAndStatus(null, InvoiceStatus.OPEN); 
+        List<CreditCardInvoice> vencidas = invoiceRepository
+            .findAbertasVencidas(LocalDate.now());
 
-        LocalDate hoje = LocalDate.now();
-        abertas.stream()
-            .filter(inv -> !inv.getClosingDate().isAfter(hoje))
-            .forEach(inv -> {
-                inv.setStatus(InvoiceStatus.CLOSED);
-                invoiceRepository.save(inv);
-            });
+        vencidas.forEach(inv -> {
+            inv.setStatus(InvoiceStatus.CLOSED);
+            invoiceRepository.save(inv);
+        });
+
+        log.info("Faturas fechadas: {}", vencidas.size());
     }
 
     private void devolverLimiteAoCartao(Account account, BigDecimal valor) {

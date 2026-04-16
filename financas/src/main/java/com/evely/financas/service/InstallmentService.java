@@ -21,6 +21,8 @@ public class InstallmentService {
     private final UserRepository userRepository;
     private final BalanceService balanceService;
 
+    // InstallmentService.java — método pagarParcela completo
+
     @Transactional
     public Installment pagarParcela(UUID id) {
         Installment parcela = installmentRepository.findById(id)
@@ -33,11 +35,28 @@ public class InstallmentService {
         parcela.setStatus(InstallmentStatus.PAID);
         installmentRepository.save(parcela);
 
-        // Se for reposição de auto-empréstimo, movimenta entre contas
-        if (parcela.getTransaction().getType() == TransactionType.INTERNAL_REPAYMENT) {
+        TransactionType tipo = parcela.getTransaction().getType();
+
+        if (tipo == TransactionType.INTERNAL_REPAYMENT) {
+            // Auto-empréstimo: dinheiro volta da corrente para a reserva
             balanceService.transferir(
-                parcela.getTransaction().getAccount(),            // sai da corrente
-                parcela.getTransaction().getDestinationAccount(), // volta para a reserva
+                parcela.getTransaction().getAccount(),
+                parcela.getTransaction().getDestinationAccount(),
+                parcela.getAmount()
+            );
+            return parcela;
+        }
+
+        // Parcela vinculada a fatura de cartão: o débito acontece no pagarFatura()
+        // Não debitar duas vezes
+        if (parcela.getInvoice() != null) {
+            return parcela;
+        }
+
+        // Parcela comum (EXPENSE, LOAN_OUT): debita da conta da transação
+        if (tipo == TransactionType.EXPENSE || tipo == TransactionType.LOAN_OUT) {
+            balanceService.baixarSaldo(
+                parcela.getTransaction().getAccount(),
                 parcela.getAmount()
             );
         }

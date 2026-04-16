@@ -4,10 +4,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.evely.financas.model.Transaction;
+import com.evely.financas.model.User;
 import com.evely.financas.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,9 +26,9 @@ public class TransactionController {
     public ResponseEntity<String> registrarTransacao(
             @RequestBody Transaction transaction, 
             @RequestParam(defaultValue = "1") int parcelas,
-            @RequestParam UUID UserID) { 
+            @AuthenticationPrincipal User user) { 
         
-        transactionService.registrarTransacao(transaction, parcelas, UserID);
+        transactionService.registrarTransacao(transaction, parcelas, user.getId());
         
         return ResponseEntity.status(201).body("Transação registrada com " + parcelas + " parcelas");
     }

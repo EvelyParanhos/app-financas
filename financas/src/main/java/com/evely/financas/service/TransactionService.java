@@ -155,12 +155,24 @@ public class TransactionService {
         transactionRepository.save(transacao);
     }
 
+
     public void excluir(UUID id) {
         Transaction transaction = transactionRepository.findById(id)
             .orElseThrow(() -> new ObjectNotFoundException("Transação não encontrada!"));
-        transactionRepository.delete(transaction);
-    }
-    
+
+        boolean temParcelaPaga = installmentRepository
+            .existeParcellaPagaParaTransacao(id);
+
+        if (temParcelaPaga) {
+            throw new RuntimeException(
+                "Não é possível excluir esta transação pois já existem parcelas pagas. " +
+                "Para desfazer, registre um estorno."
+            );
+        }
+
+    // Todas pendentes — cascade cuida das installments (orphanRemoval = true)
+    transactionRepository.delete(transaction);
+}
     private void atualizarSaldoAutomatico(Transaction transacao) {
         switch (transacao.getType()) {
             case INCOME -> balanceService.subirSaldo(

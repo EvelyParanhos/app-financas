@@ -1,5 +1,6 @@
 package com.evely.financas.repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,4 +31,11 @@ public interface CreditCardInvoiceRepository extends JpaRepository<CreditCardInv
         ORDER BY i.referenceYear DESC, i.referenceMonth DESC
     """)
     List<CreditCardInvoice> findPendingInvoicesByUserId(@Param("userId") UUID userId);
+
+    @Query("""
+        SELECT i FROM CreditCardInvoice i
+        WHERE i.status = 'OPEN'
+        AND i.closingDate <= :hoje
+    """)
+    List<CreditCardInvoice> findAbertasVencidas(@Param("hoje") LocalDate hoje);
 }
