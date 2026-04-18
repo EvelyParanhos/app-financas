@@ -31,6 +31,7 @@ public class UserService {
             
             // Se estiver PENDING, nós apenas atualizamos a senha e deixamos o fluxo gerar um novo código
             existingUser.setPassword(pe.encode(user.getPassword()));
+            existingUser.setStatus(UserStatus.PENDING); // ← reseta BLOCKED também
             existingUser.setVerificationAttempts(0);
             return userRepository.save(existingUser);
         }
@@ -66,5 +67,11 @@ public class UserService {
         usuarioExistente.setTelegramId(usuarioAtualizado.getTelegramId());
         return userRepository.save(usuarioExistente);
     }
+    
+    public User buscarPorEmail(String email) {
+        return userRepository.findByEmail(email)
+            .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado"));
+    }
+
     
 }

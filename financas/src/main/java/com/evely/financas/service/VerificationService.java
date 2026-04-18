@@ -25,7 +25,7 @@ public class VerificationService {
             throw new ObjectNotFoundException("Conta bloqueada por excesso de tentativas. Contate o suporte.");
         }
 
-        if (user.getVerificationExpiry().isBefore(LocalDateTime.now())) {
+        if (user.getVerificationExpiry() == null || user.getVerificationExpiry().isBefore(LocalDateTime.now())) {
             throw new ObjectNotFoundException("O código expirou! Volte ao cadastro e tente registrar novamente para receber um novo código.");
         }
 

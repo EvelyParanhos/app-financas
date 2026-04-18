@@ -1,5 +1,5 @@
 import { useState, useContext } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { AuthWrap } from "../../components/AuthWrap";
 import { Input } from "../../components/Input";
@@ -8,8 +8,8 @@ import { AuthContext } from "../../context/AuthContext"; // <-- Importa o Contex
 
 export function Login() {
   const navigate = useNavigate();
-  const { signIn } = useContext(AuthContext); // Traz a função mágica que fala com a API
-  
+  const location = useLocation();
+  const { signIn } = useContext(AuthContext);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
@@ -24,7 +24,8 @@ export function Login() {
       
       // Aqui você pode colocar uma lógica depois para saber se é a primeira vez
       // e mandar pro /onboarding, mas por enquanto vamos direto pro sistema!
-      navigate('/dashboard'); 
+      const redirectTo = location.state?.redirectTo || '/dashboard';
+      navigate(redirectTo);
     } catch (error) {
       alert(error.response?.data?.message || "Credenciais inválidas.");
     } finally {

@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DollarSign, ArrowRight, LayoutDashboard, CreditCard, TrendingUp, Target, Plus, X } from "lucide-react";
 import { Button } from "../../components/Button";
-import { api } from "../../services/api"; // <-- Importe a API para usarmos no final
+import { api } from "../../services/api";
+import { parseCurrency } from "../../utils/currency";
 
 const ONBOARD_STEPS = [
   { icon: LayoutDashboard, title:"Visão completa do mês", desc:"Acompanhe saldo, parcelas e gastos por categoria em um só lugar." },
@@ -62,17 +63,44 @@ export function Onboarding() {
   const rmRow = (setter, i) => setter(p=>p.filter((_,idx)=>idx!==i));
 
   const handleFinish = async () => {
-    // Essa lógica enviará os dados para a API posteriormente
     try {
       setLoading(true);
-      // Aqui será feito o laço (loop) para salvar contas, cartões e despesas fixas.
-      // Exemplo (pseudocódigo da nossa próxima integração completa):
-      // await Promise.all(accs.filter(a => a.name).map(a => api.post('/accounts', a)));
-      // await Promise.all(cards.filter(c => c.name).map(c => api.post('/accounts', { ...c, type: 'CREDIT_CARD' })));
-      
+
+      const contasValidas = accs.filter(a => a.name.trim());
+      await Promise.all(
+        contasValidas.map(a =>
+          api.post('/accounts', { name: a.name, type: a.type })
+        )
+      );
+
+      const cartoesValidos = cards.filter(c => c.name.trim());
+      await Promise.all(
+        cartoesValidos.map(c =>
+          api.post('/accounts', {
+            name: c.name,
+            type: 'CREDIT_CARD',
+            cardLimit: parseCurrency(c.limit),
+            closingDay: parseInt(c.closingDay) || 5,
+            dueDay: parseInt(c.dueDay) || 10,
+          })
+        )
+      );
+
+      const fixosValidos = fixeds.filter(f => f.desc.trim());
+      await Promise.all(
+        fixosValidos.map(f =>
+          api.post('/recurring', {
+            description: f.desc,
+            estimatedAmount: parseCurrency(f.amount),
+            type: 'EXPENSE',
+            dayOfMonth: 1,
+          })
+        )
+      );
+
       navigate('/dashboard');
     } catch (error) {
-      alert("Ocorreu um erro ao salvar as configurações iniciais.");
+      alert(error.response?.data?.message || "Erro ao salvar configurações iniciais.");
     } finally {
       setLoading(false);
     }

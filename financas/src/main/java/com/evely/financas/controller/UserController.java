@@ -59,4 +59,12 @@ public class UserController {
         verificationService.validarCodigo(data.email(), data.code());
         return ResponseEntity.ok("Conta ativada com sucesso! Agora você pode usar o sistema.");
     }
+    
+    @PostMapping("/reenviar")
+    public ResponseEntity<String> reenviarCodigo(@RequestBody VerificationDTO data) {
+        User user = userService.buscarPorEmail(data.email());
+        String codigo = verificationService.solicitarNovoCodigo(user.getId());
+        emailService.enviarEmailVerificacao(data.email(), codigo);
+        return ResponseEntity.ok("Novo código enviado! Verifique seu e-mail.");
+    }
 }

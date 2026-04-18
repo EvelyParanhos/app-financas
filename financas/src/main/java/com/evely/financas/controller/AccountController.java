@@ -39,8 +39,8 @@ public class AccountController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Account>> listarContas() {
-        List <Account> contas = accountService.listarTodas();
+    public ResponseEntity<List<Account>> listarContas(@AuthenticationPrincipal User user) {
+        List<Account> contas = accountRepository.findByOwnerId(user.getId());
         return ResponseEntity.ok(contas);
     }
 
