@@ -135,7 +135,7 @@ export function Dashboard() {
           <div style={{ background: "var(--white)", borderRadius: 16, padding: 16, boxShadow: "0 2px 12px rgba(96,80,99,.05)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <div style={{ width: 28, height: 28, borderRadius: 8, background: "#f0f8f7", display: "flex", alignItems: "center", justifyContent: "center" }}><Wallet size={14} color="var(--teal)" /></div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--gray)" }}>Saldo Disponível</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--gray)" }}>Saldo Disponível no momento</span>
             </div>
             <p style={{ fontFamily: "var(--fd)", fontSize: 20, fontWeight: 700, color: "var(--dark)" }}>{formatCurrency(data?.currentBalance)}</p>
           </div>
@@ -151,7 +151,7 @@ export function Dashboard() {
           <div style={{ background: "var(--mint)", borderRadius: 16, padding: 16, boxShadow: "0 4px 16px rgba(178,213,186,.4)", border: "1px solid #9fcfa9" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,.4)", display: "flex", alignItems: "center", justifyContent: "center" }}><TrendingUp size={14} color="var(--deep)" /></div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--deep)" }}>Sobra Projetada</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--deep)" }}>Depois de pagar minhas dívidas, quanto sobrou?</span>
             </div>
             <p style={{ fontFamily: "var(--fd)", fontSize: 22, fontWeight: 800, color: "var(--deep)" }}>{formatCurrency(data?.projectedLeftover)}</p>
           </div>

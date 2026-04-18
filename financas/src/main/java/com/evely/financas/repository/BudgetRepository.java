@@ -59,6 +59,4 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
         @Param("month") int month,
         @Param("year") int year
     );
-
-    List<Budget> findByUserId(UUID userId);
 }

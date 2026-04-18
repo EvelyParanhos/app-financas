@@ -2,6 +2,7 @@ package com.evely.financas.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -73,11 +74,54 @@ public class BudgetService {
 
     // Retorna o status de todos os budgets do mês com o gasto real calculado
     public List<BudgetStatusDTO> getStatusDoMes(UUID userId, int month, int year) {
-        List<Budget> budgets = budgetRepository.findByUserAndPeriod(userId, month, year);
+        
+        // 1. Usa a SUA query otimizada (JOIN FETCH) que busca os orçamentos do mês exato
+        List<Budget> meusBudgets = budgetRepository.findByUserAndPeriod(userId, month, year);
+        
+        List<BudgetStatusDTO> listaStatus = new ArrayList<>();
 
-        return budgets.stream()
-            .map(budget -> calcularStatus(budget, userId, month, year))
-            .toList();
+        for (Budget budget : meusBudgets) {
+            UUID categoryId = budget.getCategory().getId();
+
+            // 2. Usa a SUA query perfeita que soma as parcelas (Installment) do mês
+            BigDecimal gasto = budgetRepository.calcularGastoPorCategoria(
+                    userId, categoryId, month, year
+            );
+
+            // 3. A SUA lógica matemática de percentual e status
+            BigDecimal limite = budget.getAmountLimit();
+            BigDecimal restante = limite.subtract(gasto);
+
+            int percentual = 0;
+            if (limite.compareTo(BigDecimal.ZERO) > 0) {
+                percentual = gasto
+                    .divide(limite, 4, java.math.RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100))
+                    .intValue();
+            }
+
+            com.evely.financas.enums.AlertStatus status;
+            if (percentual >= 100) {
+                status = com.evely.financas.enums.AlertStatus.EXCEEDED;
+            } else if (percentual >= budget.getAlertThreshold()) {
+                status = com.evely.financas.enums.AlertStatus.WARNING;
+            } else {
+                status = com.evely.financas.enums.AlertStatus.OK;
+            }
+
+            // 4. Monta o DTO de Saída para o React
+            listaStatus.add(new BudgetStatusDTO(
+                    budget.getId(),
+                    budget.getCategory().getName(),
+                    limite,
+                    gasto,
+                    restante.max(BigDecimal.ZERO), // Nunca retorna negativo
+                    percentual,
+                    status
+            ));
+        }
+
+        return listaStatus;
     }
 
     // -------------------------------------------------------------------------
