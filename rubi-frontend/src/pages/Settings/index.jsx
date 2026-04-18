@@ -71,7 +71,7 @@ export function Settings() {
           {activeTab === "partner" && (
             <div className="fadeUp" style={{ maxWidth: 450 }}>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--dark)", marginBottom: 8 }}>Gestão Compartilhada</h2>
-              <p style={{ fontSize: 13, color: "var(--gray)", marginBottom: 24 }}>Conecte-se com o Matheus para dividir gastos e visualizar orçamentos conjuntos.</p>
+              <p style={{ fontSize: 13, color: "var(--gray)", marginBottom: 24 }}>Conecte-se com o seu parceiro ou família para dividir gastos e visualizar orçamentos conjuntos.</p>
               
               <div style={{ background: "var(--cream)", padding: 24, borderRadius: 12, marginBottom: 24, textAlign: "center" }}>
                 <p style={{ fontSize: 12, color: "var(--gray)", fontWeight: 600, marginBottom: 8, textTransform: "uppercase" }}>Seu Código de Convite</p>
