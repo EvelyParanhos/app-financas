@@ -8,7 +8,8 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Verify } from './pages/Verify';
 import { Onboarding } from './pages/Onboarding';
-import { Dashboard } from './pages/Dashboard'; //
+import { Dashboard } from './pages/Dashboard'; 
+import { Settings } from './pages/Settings';
 
 // Componente que blinda as rotas privadas
 function PrivateRoute({ children }) {
@@ -30,9 +31,8 @@ export function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/dashboard" element={
-            <PrivateRoute><Dashboard /></PrivateRoute> 
-          } />
+          <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute> } />
+          <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
