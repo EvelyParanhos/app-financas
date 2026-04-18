@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import com.evely.financas.dto.*;
 import com.evely.financas.enums.AccountType;
 import com.evely.financas.enums.InstallmentStatus;
+import com.evely.financas.enums.TransactionType;
 import com.evely.financas.model.*;
 import com.evely.financas.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -277,9 +278,8 @@ public class DashboardService {
 
     private BigDecimal calcularTotalRecorrentes(UUID userId) {
         return recurringRepository.findByAccountOwnerId(userId).stream()
-            .map(r -> r.getEstimatedAmount() != null
-                ? r.getEstimatedAmount()
-                : BigDecimal.ZERO)
+            .filter(r -> r.getType() == TransactionType.EXPENSE) // ← só despesas
+            .map(r -> r.getEstimatedAmount() != null ? r.getEstimatedAmount() : BigDecimal.ZERO)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }
