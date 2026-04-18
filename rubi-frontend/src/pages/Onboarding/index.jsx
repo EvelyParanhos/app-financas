@@ -17,6 +17,7 @@ export function Onboarding() {
   const [step, setStep] = useState(0); 
   const [slide, setSlide] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [incomes, setIncomes] = useState([{ desc: "", amount: "" }]);
   
   // Contas agora nascem por padrão como CHECKING (a carteira CASH já é criada no backend)
   const [accs, setAccs] = useState([{ name: "", type: "CHECKING" }]);
@@ -55,7 +56,7 @@ export function Onboarding() {
     </div>
   );
 
-  const steps = ["Suas contas","Cartões de crédito","Gastos fixos"];
+  const steps = ["Suas contas", "Cartões de crédito", "Gastos fixos", "Entradas fixas"];
   const curr = step - 1;
 
   const addRow = (setter, proto) => setter(p=>[...p,{...proto}]);
@@ -72,7 +73,17 @@ export function Onboarding() {
           api.post('/accounts', { name: a.name, type: a.type })
         )
       );
-
+      const entradasValidas = incomes.filter(f => f.desc.trim());
+      await Promise.all(
+        entradasValidas.map(f =>
+          api.post('/recurring', {
+            description: f.desc,
+            estimatedAmount: parseCurrency(f.amount),
+            type: 'INCOME',   // ← diferença em relação ao EXPENSE
+            dayOfMonth: 5,    // dia padrão — você pode adicionar campo depois
+          })
+        )
+      );
       const cartoesValidos = cards.filter(c => c.name.trim());
       await Promise.all(
         cartoesValidos.map(c =>
@@ -215,9 +226,37 @@ export function Onboarding() {
           </button>
         </>}
 
+        {step === 4 && <>
+          <h2 style={{fontFamily:"var(--fd)",fontSize:22,fontWeight:700,color:"var(--dark)",marginBottom:6}}>Entradas mensais fixas</h2>
+          <p style={{fontSize:14,color:"var(--gray)",marginBottom:24}}>
+            Adicione seus recebimentos mensais: salário, vale alimentação, freelance recorrente...
+          </p>
+          {incomes.map((f, i) => (
+            <div key={i} style={{display:"flex",gap:8,marginBottom:10,alignItems:"center"}}>
+              <input value={f.desc} onChange={e => setRow(setIncomes,i,"desc",e.target.value)} placeholder="Ex: Salário, Vale Alimentação"
+                style={{flex:2,padding:"10px 12px",border:"1.5px solid #e4e0e4",borderRadius:8,fontSize:14,outline:"none"}} />
+              <input
+                value={f.amount}
+                onChange={e => {
+                  let v = e.target.value.replace(/\D/g,"");
+                  v = v ? "R$ " + (parseInt(v,10)/100).toFixed(2).replace(".",",").replace(/(\d)(?=(\d{3})+(?!\d))/g,"$1.") : "";
+                  setRow(setIncomes,i,"amount",v);
+                }}
+                placeholder="R$ 0,00" type="text" inputMode="numeric"
+                style={{flex:1,padding:"10px 12px",border:"1.5px solid #e4e0e4",borderRadius:8,fontSize:14,outline:"none"}} />
+              {incomes.length > 1 && (
+                <button onClick={() => rmRow(setIncomes, i)} style={{background:"transparent",color:"var(--gray)"}}><X size={16}/></button>
+              )}
+            </div>
+          ))}
+          <button onClick={() => addRow(setIncomes,{desc:"",amount:""})} style={{background:"transparent",color:"var(--teal)",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:6,marginBottom:24}}>
+            <Plus size={15}/> Adicionar entrada
+          </button>
+        </>}
+
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <button onClick={()=>setStep(p=>p-1)} style={{background:"transparent",color:"var(--gray)",fontSize:14}}>← Voltar</button>
-          {step < 3
+          {step < 4
             ? <Button onClick={()=>setStep(p=>p+1)} style={{padding:"11px 28px"}}>Próximo <ArrowRight size={15}/></Button>
             : <Button onClick={handleFinish} disabled={loading} style={{padding:"11px 28px",background:"var(--deep)"}}>
                 {loading ? "Salvando..." : "Entrar no Rubi"} <ArrowRight size={15}/>
