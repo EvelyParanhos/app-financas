@@ -17,28 +17,24 @@ public class VerificationService {
     private final UserRepository userRepository;
 
     @Transactional
-    public void validarCodigo(UUID userId, String codigoInformado) {
-        User user = userRepository.findById(userId)
+    public void validarCodigo(String email, String codigoInformado) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado"));
 
-        // 1. Verificar se está bloqueado
         if (user.getStatus() == UserStatus.BLOCKED) {
             throw new ObjectNotFoundException("Conta bloqueada por excesso de tentativas. Contate o suporte.");
         }
 
-        // 2. Verificar expiração (2 minutos)
         if (user.getVerificationExpiry().isBefore(LocalDateTime.now())) {
-            throw new ObjectNotFoundException("O código expirou! Solicite um novo.");
+            throw new ObjectNotFoundException("O código expirou! Volte ao cadastro e tente registrar novamente para receber um novo código.");
         }
 
-        // 3. Validar código e tentativas
         if (user.getVerificationCode().equals(codigoInformado)) {
             user.setStatus(UserStatus.ACTIVE);
-            user.setVerificationAttempts(0); // Reseta tentativas
-            user.setVerificationCode(null);  // Limpa o código usado
+            user.setVerificationAttempts(0); 
+            user.setVerificationCode(null);  
         } else {
             user.setVerificationAttempts(user.getVerificationAttempts() + 1);
-            
             if (user.getVerificationAttempts() >= 5) {
                 user.setStatus(UserStatus.BLOCKED);
                 throw new ObjectNotFoundException("Limite de tentativas excedido! Conta bloqueada.");

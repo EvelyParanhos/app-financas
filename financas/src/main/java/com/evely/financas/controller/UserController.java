@@ -7,6 +7,8 @@ import com.evely.financas.model.User;
 import com.evely.financas.service.EmailService;
 import com.evely.financas.service.UserService;
 import com.evely.financas.service.VerificationService;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
 import java.util.UUID;
@@ -26,14 +28,15 @@ public class UserController {
     private final UserService userService;
     private final VerificationService verificationService;
     private final EmailService emailService;
+    public record VerificationDTO(String email, String code) {}
 
     @PostMapping
-    public ResponseEntity <User> salvar(@RequestBody User user) {  
+    public ResponseEntity<User> salvar(@Valid @RequestBody User user) {  
         User novoUser = userService.salvar(user);
         String codigo = verificationService.solicitarNovoCodigo(novoUser.getId());
         emailService.enviarEmailVerificacao(novoUser.getEmail(), codigo);
         return ResponseEntity.status(201).body(novoUser);
-
+        
     }
     @GetMapping
     public ResponseEntity<List<User>> listarTodos () {
@@ -52,8 +55,8 @@ public class UserController {
     }
 
     @PostMapping("/verificar")
-    public ResponseEntity <String> verificarConta (@RequestParam UUID id, @RequestParam String code) {
-        verificationService.validarCodigo(id, code);
+    public ResponseEntity<String> verificarConta(@RequestBody VerificationDTO data) {
+        verificationService.validarCodigo(data.email(), data.code());
         return ResponseEntity.ok("Conta ativada com sucesso! Agora você pode usar o sistema.");
     }
 }

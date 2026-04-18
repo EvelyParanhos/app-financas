@@ -12,6 +12,8 @@ import com.evely.financas.enums.UserStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 @Entity
@@ -36,6 +38,11 @@ public class User implements UserDetails {
     @NotBlank(message = "O e-mail é obrigatório.")
     private String email;
 
+    // No arquivo User.java, atualize a propriedade password para ficar assim:
+    @NotBlank(message = "A senha é obrigatória")
+    @Size(min = 8, message = "A senha deve ter no mínimo 8 caracteres")
+    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[@$!%*#?&])[A-Za-z\\d@$!%*#?&]{8,}$", 
+             message = "A senha deve conter letras, números e caracteres especiais")
     private String password;
 
     @Enumerated(EnumType.STRING)

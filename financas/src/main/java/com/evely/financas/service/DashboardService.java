@@ -217,8 +217,7 @@ public class DashboardService {
         return accountRepository.findByOwnerId(userId).stream()
             .filter(acc ->
                 acc.getType() == AccountType.CHECKING ||
-                acc.getType() == AccountType.CASH ||
-                acc.getType() == AccountType.WALLET
+                acc.getType() == AccountType.CASH
             )
             .map(acc -> snapshotRepository
                 .findFirstByAccountOrderBySnapshotDateDesc(acc)

@@ -1,0 +1,52 @@
+/* src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Paleta Oficial do Rubi */
+  --deep: #605063;
+  --teal: #248f8d;
+  --sage: #61ada0;
+  --mint: #b2d5ba;
+  --cream: #eff3cd;
+  
+  /* Cores de Apoio */
+  --white: #ffffff;
+  --dark: #1a161b;
+  --gray: #8a8590;
+  --danger: #d95b5b;
+  --success: #4caf80;
+  --warn: #e6a817;
+  
+  /* Tipografia */
+  --fd: 'Syne', sans-serif;
+  --fb: 'DM Sans', sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden; /* A REGRA DE ZERO SCROLL */
+  font-family: var(--fb);
+  background-color: var(--cream);
+}
+
+/* Animações Globais */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+
+.fadeUp { animation: fadeUp .4s ease forwards; }
+.scaleIn { animation: scaleIn .3s ease forwards; }
+
+button { cursor: pointer; font-family: var(--fb); border: none; transition: all .18s; }
+input, select { font-family: var(--fb); outline: none; transition: border-color .2s; }
+input:focus, select:focus { border-color: var(--teal) !important; }
+
+/* Scrollbar Customizada (Aparece apenas DENTRO das listas, nunca na tela toda) */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--mint); border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }

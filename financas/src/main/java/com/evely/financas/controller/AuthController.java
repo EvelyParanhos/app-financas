@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.evely.financas.dto.AuthDTO;
 import com.evely.financas.dto.TokenDTO;
+import com.evely.financas.enums.UserStatus;
 import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.User;
 import com.evely.financas.repository.UserRepository;
@@ -29,6 +30,9 @@ public class AuthController {
                 .orElseThrow(() -> new ObjectNotFoundException("Usuário ou senha incorretos"));
         if (!passwordEncoder.matches(data.password(), user.getPassword())) {
             throw new ObjectNotFoundException("Usuário ou senha incorretos");
+        }
+        if (user.getStatus() == UserStatus.PENDING) {
+            throw new ObjectNotFoundException("Sua conta ainda não foi verificada! Por favor, cadastre-se novamente para receber um novo código.");
         }
         String token = jwtService.gerarToken(user);
 

@@ -136,5 +136,6 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
 
     @Modifying
     @jakarta.transaction.Transactional
-    Long deleteByIsSimulationTrueAndCreatedAtBefore(java.time.LocalDateTime dia);
+    @Query("DELETE FROM Installment i WHERE i.transaction.id IN (SELECT t.id FROM Transaction t WHERE t.isSimulation = true AND t.createdAt < :dia)")
+    Long deleteByIsSimulationTrueAndCreatedAtBefore(@Param("dia") java.time.LocalDateTime dia);
 }
