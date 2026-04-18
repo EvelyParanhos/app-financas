@@ -29,16 +29,19 @@ public class AccountService {
         userRepository.findById(ownerId)
             .orElseThrow(()->new ObjectNotFoundException("Não foi possível criar a conta: Usuário dono não encontrado!"));
         
-        if (account.getType() == AccountType.CREDIT_CARD) {
+        // ← Salva a conta PRIMEIRO para gerar o ID
+        Account salva = accountRepository.save(account);
+
+        // ← Só depois cria o snapshot com a conta já persistida
+        if (salva.getType() == AccountType.CREDIT_CARD) {
             Snapshot initialSnapshot = new Snapshot();
-            initialSnapshot.setAccount(account);
-            initialSnapshot.setAmount(account.getCardLimit());
+            initialSnapshot.setAccount(salva);
+            initialSnapshot.setAmount(salva.getCardLimit() != null ? salva.getCardLimit() : java.math.BigDecimal.ZERO);
             initialSnapshot.setSnapshotDate(LocalDateTime.now());
             snapshotRepository.save(initialSnapshot);
         }
     
-        Account salva = accountRepository.save(account);
-        return accountRepository.findById(salva.getId()).get();
+        return salva;
     }
 
 

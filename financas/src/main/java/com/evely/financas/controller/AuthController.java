@@ -1,5 +1,6 @@
 package com.evely.financas.controller;
 
+import java.time.LocalDateTime;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,6 +11,7 @@ import com.evely.financas.dto.AuthDTO;
 import com.evely.financas.dto.TokenDTO;
 import com.evely.financas.enums.UserStatus;
 import com.evely.financas.exception.ObjectNotFoundException;
+import com.evely.financas.exception.StandardError;
 import com.evely.financas.model.User;
 import com.evely.financas.repository.UserRepository;
 import com.evely.financas.service.JwtService;
@@ -25,17 +27,26 @@ public class AuthController {
     private final BCryptPasswordEncoder passwordEncoder;
 
     @PostMapping("/login")
-    public ResponseEntity<TokenDTO> login(@RequestBody AuthDTO data) {
-        User user = userRepository.findByEmail(data.email())
-                .orElseThrow(() -> new ObjectNotFoundException("Usuário ou senha incorretos"));
-        if (!passwordEncoder.matches(data.password(), user.getPassword())) {
-            throw new ObjectNotFoundException("Usuário ou senha incorretos");
+    public ResponseEntity<?> login(@RequestBody AuthDTO data) {
+        User user = userRepository.findByEmail(data.email()).orElse(null);
+        
+        // Mensagem genérica em todos os casos de falha — nunca revela o motivo
+        if (user == null || !passwordEncoder.matches(data.password(), user.getPassword())) {
+            return ResponseEntity.status(401).body(
+                new StandardError(LocalDateTime.now(), 401, "Não autorizado", "Credenciais inválidas.", "/api/auth/login")
+            );
         }
         if (user.getStatus() == UserStatus.PENDING) {
-            throw new ObjectNotFoundException("Sua conta ainda não foi verificada! Por favor, cadastre-se novamente para receber um novo código.");
+            return ResponseEntity.status(403).body(
+                new StandardError(LocalDateTime.now(), 403, "Conta pendente", "Sua conta ainda não foi verificada.", "/api/auth/login")
+            );
         }
-        String token = jwtService.gerarToken(user);
+        if (user.getStatus() == UserStatus.BLOCKED) {
+            return ResponseEntity.status(403).body(
+                new StandardError(LocalDateTime.now(), 403, "Conta bloqueada", "Conta bloqueada por excesso de tentativas.", "/api/auth/login")
+            );
+        }
 
-        return ResponseEntity.ok(new TokenDTO(token));
+        return ResponseEntity.ok(new TokenDTO(jwtService.gerarToken(user)));
     }
 }

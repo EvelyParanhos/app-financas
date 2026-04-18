@@ -45,13 +45,21 @@ public class AccountController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> excluir(@PathVariable UUID id) {
+    public ResponseEntity<Void> excluir(@PathVariable UUID id, @AuthenticationPrincipal User user) {
+        Account conta = accountRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
+        if (!conta.getOwner().getId().equals(user.getId()))
+            throw new RuntimeException("Sem permissão para excluir esta conta.");
         accountService.excluir(id);
-        return ResponseEntity.noContent().build(); 
+        return ResponseEntity.noContent().build();
     }
-    
+
     @PutMapping("/{id}")
-    public ResponseEntity<Account> editar(@PathVariable UUID id, @RequestBody Account account) {
+    public ResponseEntity<Account> editar(@PathVariable UUID id, @RequestBody Account account, @AuthenticationPrincipal User user) {
+        Account existente = accountRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
+        if (!existente.getOwner().getId().equals(user.getId()))
+            throw new RuntimeException("Sem permissão para editar esta conta.");
         Account atualizada = accountService.editar(id, account);
         return ResponseEntity.ok(atualizada);
     }

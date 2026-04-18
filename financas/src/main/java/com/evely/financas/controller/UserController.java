@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -66,5 +67,10 @@ public class UserController {
         String codigo = verificationService.solicitarNovoCodigo(user.getId());
         emailService.enviarEmailVerificacao(data.email(), codigo);
         return ResponseEntity.ok("Novo código enviado! Verifique seu e-mail.");
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<User> me(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(user);
     }
 }
