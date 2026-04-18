@@ -36,12 +36,11 @@ public class TransactionService {
         User pagador = userRepository.findById(userId)
             .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado!"));
 
-        // Apenas usuários ativos podem registrar transações reais
         if (!transacao.isSimulation() && !pagador.getStatus().equals(UserStatus.ACTIVE)) {
-            throw new RuntimeException("Sua conta precisa estar ATIVA para registrar gastos reais.");
+            throw new RuntimeException(
+                "Sua conta precisa estar ATIVA para registrar gastos reais.");
         }
 
-        // Validação antecipada para TRANSFER
         if (transacao.getType() == TransactionType.TRANSFER
                 && transacao.getDestinationAccount() == null) {
             throw new RuntimeException("Transferência exige uma conta de destino.");
@@ -52,7 +51,6 @@ public class TransactionService {
         BigDecimal valorParcela = transacao.getTotalAmount()
             .divide(BigDecimal.valueOf(totalParcelas), 2, RoundingMode.HALF_UP);
 
-        // Resolve mês base da primeira parcela
         LocalDate dataBase = transacao.getPurchaseDate() != null
             ? transacao.getPurchaseDate()
             : LocalDate.now();
@@ -77,7 +75,6 @@ public class TransactionService {
                     mesDaParcela.withDayOfMonth(transacao.getAccount().getDueDay())
                 );
 
-                // Fatura só é criada para transações reais
                 if (!transacao.isSimulation()) {
                     CreditCardInvoice invoice = creditCardInvoiceService.buscarOuCriarFatura(
                         transacao.getAccount(),
@@ -96,17 +93,33 @@ public class TransactionService {
 
         Transaction transacaoSalva = transactionRepository.save(transacao);
 
-        // Movimentação de saldo — apenas transações reais
+        // ----------------------------------------------------------------
+        // RN01 — Regra de Efeito de Liquidação
+        //
+        // Apenas TRANSFER e compras em CARTÃO afetam o saldo imediatamente.
+        //
+        // - TRANSFER: o dinheiro sai e entra nas contas na hora (RN03).
+        // - CREDIT_CARD: baixa o limite disponível do cartão na hora,
+        //   mas NÃO afeta o saldo bancário (RN02). O saldo bancário só
+        //   é afetado quando a fatura é paga (pagarFatura).
+        // - EXPENSE / INCOME em conta corrente ou carteira: o saldo só
+        //   muda quando a parcela é marcada como PAGA (pagarParcela).
+        //   Isso representa boletos, contas e recebimentos futuros.
+        // ----------------------------------------------------------------
         if (!transacaoSalva.isSimulation()) {
             if (ehCartao) {
-                // Cartão: baixa o limite total imediatamente
                 balanceService.baixarSaldo(
                     transacaoSalva.getAccount(),
                     transacaoSalva.getTotalAmount()
                 );
-            } else {
-                atualizarSaldoAutomatico(transacaoSalva);
+            } else if (transacaoSalva.getType() == TransactionType.TRANSFER) {
+                balanceService.transferir(
+                    transacaoSalva.getAccount(),
+                    transacaoSalva.getDestinationAccount(),
+                    transacaoSalva.getTotalAmount()
+                );
             }
+            // EXPENSE e INCOME: saldo afetado apenas em pagarParcela()
         }
 
         return transacaoSalva;
@@ -123,14 +136,11 @@ public class TransactionService {
 
         boolean ehCartao = transacao.getAccount().getType() == AccountType.CREDIT_CARD;
 
-        // Torna a transação oficial
         transacao.setSimulation(false);
 
         if (ehCartao) {
-            // Valida se o limite ainda comporta o valor (pode ter mudado desde a simulação)
             balanceService.validarSaldo(transacao.getAccount(), transacao.getTotalAmount());
 
-            // Cria as faturas e vincula as parcelas — o que não foi feito na simulação
             for (Installment parcela : transacao.getInstallments()) {
                 LocalDate mesDaParcela = parcela.getDueDate().withDayOfMonth(1);
                 CreditCardInvoice invoice = creditCardInvoiceService.buscarOuCriarFatura(
@@ -143,50 +153,45 @@ public class TransactionService {
                 installmentRepository.save(parcela);
             }
 
-            // Baixa o limite após criar as faturas
             balanceService.baixarSaldo(
                 transacao.getAccount(),
                 transacao.getTotalAmount()
             );
-        } else {
-            atualizarSaldoAutomatico(transacao);
+        } else if (transacao.getType() == TransactionType.TRANSFER) {
+            // Transferência: executa imediatamente ao efetivar
+            balanceService.transferir(
+                transacao.getAccount(),
+                transacao.getDestinationAccount(),
+                transacao.getTotalAmount()
+            );
         }
+        // EXPENSE / INCOME: saldo afetado apenas quando a parcela for paga
 
         transactionRepository.save(transacao);
     }
 
-
-    public void excluir(UUID id) {
+    @Transactional
+    public void excluir(UUID id, UUID userId) {
         Transaction transaction = transactionRepository.findById(id)
             .orElseThrow(() -> new ObjectNotFoundException("Transação não encontrada!"));
 
+        // Segurança: apenas o dono da conta pode excluir
+        if (!transaction.getAccount().getOwner().getId().equals(userId)) {
+            throw new RuntimeException(
+                "Sem permissão para excluir esta transação.");
+        }
+
+        // RN12 — Bloqueio de eliminação com histórico
         boolean temParcelaPaga = installmentRepository
             .existeParcellaPagaParaTransacao(id);
 
         if (temParcelaPaga) {
             throw new RuntimeException(
                 "Não é possível excluir esta transação pois já existem parcelas pagas. " +
-                "Para desfazer, registre um estorno."
-            );
+                "Para desfazer, registre um estorno.");
         }
 
-    // Todas pendentes — cascade cuida das installments (orphanRemoval = true)
-    transactionRepository.delete(transaction);
-}
-    private void atualizarSaldoAutomatico(Transaction transacao) {
-        switch (transacao.getType()) {
-            case INCOME -> balanceService.subirSaldo(
-                transacao.getAccount(), transacao.getTotalAmount()
-            );
-            case TRANSFER -> balanceService.transferir(
-                transacao.getAccount(),
-                transacao.getDestinationAccount(),
-                transacao.getTotalAmount()
-            );
-            // EXPENSE, LOAN_OUT, INTERNAL_REPAYMENT — todos baixam saldo
-            default -> balanceService.baixarSaldo(
-                transacao.getAccount(), transacao.getTotalAmount()
-            );
-        }
+        // RN13 — Eliminação em cascata limpa (cascade + orphanRemoval cuida das parcelas)
+        transactionRepository.delete(transaction);
     }
 }

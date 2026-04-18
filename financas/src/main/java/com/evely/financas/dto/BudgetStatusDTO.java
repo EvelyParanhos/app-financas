@@ -2,18 +2,19 @@ package com.evely.financas.dto;
 
 import java.math.BigDecimal;
 import java.util.UUID;
-import com.evely.financas.enums.AlertStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-
+import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 public class BudgetStatusDTO {
-    private UUID budgetId;
+    
+    private UUID id;
     private String categoryName;
-    private BigDecimal amountLimit;
-    private BigDecimal amountSpent;
-    private BigDecimal amountRemaining;
-    private int percentageUsed;
-    private AlertStatus alertStatus;
+    private BigDecimal limitAmount;
+    private BigDecimal spentAmount;
+    private int month;
+    private int year;
+
 }

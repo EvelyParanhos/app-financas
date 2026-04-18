@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   ChevronLeft, ChevronRight, Wallet, CreditCard, 
   TrendingUp, PiggyBank, Check, Circle, LogOut,
-  LayoutDashboard, Settings, Plus, Sparkles, ArrowDownRight, ArrowUpRight, ArrowRightLeft, Download
+  LayoutDashboard, Settings, Plus, Sparkles, ArrowDownRight, ArrowUpRight, ArrowRightLeft, Download, PieChart
 } from "lucide-react";
 import { api } from "../../services/api";
 import { AuthContext } from "../../context/AuthContext";
@@ -81,6 +81,18 @@ export function Dashboard() {
           </button>
           <button onClick={() => setIsSimModalOpen(true)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 8, color: "var(--mint)", fontWeight: 600, cursor: "pointer", transition: "all .2s" }}>
             <Sparkles size={18} /> Bola de Cristal
+          </button>
+          <button onClick={() => navigate('/dashboard')} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "rgba(255,255,255,.1)", borderRadius: 8, color: "var(--white)", fontWeight: 600, border: "none", cursor: "pointer", transition: "all .2s" }}>
+            <LayoutDashboard size={18} /> Início
+          </button>
+          
+          {/* NOVO BOTÃO DE ORÇAMENTOS AQUI */}
+          <button onClick={() => navigate('/reports')} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "transparent", borderRadius: 8, color: "rgba(255,255,255,.6)", fontWeight: 500, border: "none", cursor: "pointer", transition: "all .2s" }}>
+            <PieChart size={18} /> Orçamentos
+          </button>
+
+          <button onClick={() => navigate('/settings')} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "transparent", borderRadius: 8, color: "rgba(255,255,255,.6)", fontWeight: 500, border: "none", cursor: "pointer", transition: "all .2s" }}>
+            <Settings size={18} /> Configurações
           </button>
         </nav>
 

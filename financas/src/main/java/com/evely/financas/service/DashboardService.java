@@ -13,7 +13,6 @@ import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import com.evely.financas.dto.*;
 import com.evely.financas.enums.AccountType;
-import com.evely.financas.enums.InstallmentStatus;
 import com.evely.financas.enums.TransactionType;
 import com.evely.financas.model.*;
 import com.evely.financas.repository.*;
@@ -31,8 +30,7 @@ public class DashboardService {
     private final RecurringTransactionRepository recurringRepository;
     private final LoanRepository loanRepository;
     private final BudgetService budgetService;
-    private final TransactionRepository transactionRepository; 
-    
+    private final TransactionRepository transactionRepository;
 
     // =========================================================
     // DASHBOARD PRINCIPAL
@@ -43,26 +41,26 @@ public class DashboardService {
         LocalDate fim = inicio.with(TemporalAdjusters.lastDayOfMonth());
 
         BigDecimal currentBalance = calcularSaldoReal(userId);
-        BigDecimal committed = installmentRepository.somarDividasComFiltro(userId, inicio, fim, false);
+        BigDecimal committed = installmentRepository.somarDividasComFiltro(
+            userId, inicio, fim, false);
         if (committed == null) committed = BigDecimal.ZERO;
-        
+
         BigDecimal leftover = currentBalance.subtract(committed);
-        
+
         BigDecimal toReceive = loanRepository.totalAReceber(userId);
         if (toReceive == null) toReceive = BigDecimal.ZERO;
 
-        // NOVO: 5. Saldo Investido
         BigDecimal investedBalance = calcularSaldoInvestido(userId);
 
         List<InvoiceSummaryDTO> invoices = buildInvoiceSummaries(userId);
-        
+
         List<InstallmentItemDTO> installmentItems = installmentRepository
             .findPendingWithDetailsByUserAndPeriod(userId, inicio, fim)
             .stream().map(this::toInstallmentItem).toList();
 
-        // NOVO: 6. Últimos Lançamentos (Top 5)
+        // RN14 — Simulações são invisíveis no histórico real
         List<TransactionItemDTO> recentTransactions = transactionRepository
-            .findTop5ByAccountOwnerIdOrderByPurchaseDateDesc(userId)
+            .findTop5ByAccountOwnerIdAndIsSimulationFalseOrderByPurchaseDateDesc(userId)
             .stream()
             .map(t -> new TransactionItemDTO(
                 t.getId(),
@@ -78,7 +76,7 @@ public class DashboardService {
         boolean hasPartner = partnershipRepository.findByUserId(userId).isPresent();
 
         return new DashboardDTO(
-            currentBalance, committed, leftover, toReceive, investedBalance, 
+            currentBalance, committed, leftover, toReceive, investedBalance,
             invoices, installmentItems, recentTransactions, budgets, projection, hasPartner
         );
     }
@@ -91,17 +89,14 @@ public class DashboardService {
         LocalDate inicio = LocalDate.of(startYear, startMonth, 1);
         LocalDate fim = inicio.plusMonths(12).with(TemporalAdjusters.lastDayOfMonth());
 
-        // Uma query para trazer real + simulação agrupados por mês
         List<Object[]> rows = installmentRepository.projecaoPorMes(userId, inicio, fim);
 
-        // Monta um mapa para lookup rápido: "mes-ano" → dados
         Map<String, Object[]> dataMap = rows.stream()
             .collect(Collectors.toMap(
                 r -> r[0] + "-" + r[1],
                 r -> r
             ));
 
-        // Busca recorrentes — valor estimado fixo por mês
         BigDecimal recorrentes = calcularTotalRecorrentes(userId);
 
         List<MonthProjectionDTO> result = new ArrayList<>();
@@ -123,7 +118,7 @@ public class DashboardService {
             result.add(new MonthProjectionDTO(
                 mes.getMonthValue(),
                 mes.getYear(),
-                real.add(simulado).add(recorrentes), // projetado total
+                real.add(simulado).add(recorrentes),
                 real,
                 simulado,
                 recorrentes
@@ -148,16 +143,12 @@ public class DashboardService {
         LocalDate inicio = LocalDate.of(year, month, 1);
         LocalDate fim = inicio.with(TemporalAdjusters.lastDayOfMonth());
 
-        // Saldo consolidado — apenas contas marcadas como shared de ambos
         BigDecimal saldoCompartilhado = calcularSaldoCompartilhado(userId, partnerId);
 
-        // Total comprometido do usuário (todas as contas)
         BigDecimal committedUsuario = installmentRepository.somarDividasComFiltro(
-            userId, inicio, fim, false
-        );
+            userId, inicio, fim, false);
         if (committedUsuario == null) committedUsuario = BigDecimal.ZERO;
 
-        // Total comprometido do parceiro — apenas contas shared
         BigDecimal committedParceiro = installmentRepository
             .somarDividasComFiltroEContaShared(partnerId, inicio, fim);
         if (committedParceiro == null) committedParceiro = BigDecimal.ZERO;
@@ -165,16 +156,13 @@ public class DashboardService {
         BigDecimal totalCommitted = committedUsuario.add(committedParceiro);
         BigDecimal leftover = saldoCompartilhado.subtract(totalCommitted);
 
-        // Total a receber — soma dos dois
         BigDecimal toReceive = loanRepository.totalAReceber(userId);
         if (toReceive == null) toReceive = BigDecimal.ZERO;
         BigDecimal toReceiveParceiro = loanRepository.totalAReceber(partnerId);
         if (toReceiveParceiro == null) toReceiveParceiro = BigDecimal.ZERO;
 
-        // Faturas do usuário logado (cada um vê só as suas)
         List<InvoiceSummaryDTO> invoices = buildInvoiceSummaries(userId);
 
-        // Parcelas do mês: as do usuário + as shared do parceiro
         List<Installment> parcelasUsuario = installmentRepository
             .findPendingWithDetailsByUserAndPeriod(userId, inicio, fim);
 
@@ -186,24 +174,26 @@ public class DashboardService {
             .map(this::toInstallmentItem)
             .toList();
 
-        // Budgets e projeção do usuário logado
         List<BudgetStatusDTO> budgets = budgetService.getStatusDoMes(userId, month, year);
         List<MonthProjectionDTO> projection = buildProjection(userId, month, year);
 
-        // Calculamos o investido do casal de forma simples
         BigDecimal investedUsuario = calcularSaldoInvestido(userId);
         BigDecimal investedParceiro = calcularSaldoInvestido(partnerId);
         BigDecimal totalInvested = investedUsuario.add(investedParceiro);
 
-        // Lançamentos recentes do usuário
+        // RN14 — Simulações excluídas do histórico
         List<TransactionItemDTO> recentTransactions = transactionRepository
-            .findTop5ByAccountOwnerIdOrderByPurchaseDateDesc(userId)
+            .findTop5ByAccountOwnerIdAndIsSimulationFalseOrderByPurchaseDateDesc(userId)
             .stream()
-            .map(t -> new TransactionItemDTO(t.getId(), t.getDescription(), t.getCategory() != null ? t.getCategory().getName() : "Sem Categoria", t.getTotalAmount(), t.getPurchaseDate(), t.getType().name()))
+            .map(t -> new TransactionItemDTO(
+                t.getId(), t.getDescription(),
+                t.getCategory() != null ? t.getCategory().getName() : "Sem Categoria",
+                t.getTotalAmount(), t.getPurchaseDate(), t.getType().name()))
             .toList();
 
         return new DashboardDTO(
-            saldoCompartilhado, totalCommitted, leftover, toReceive.add(toReceiveParceiro), totalInvested,
+            saldoCompartilhado, totalCommitted, leftover,
+            toReceive.add(toReceiveParceiro), totalInvested,
             invoices, installmentItems, recentTransactions, budgets, projection, true
         );
     }
@@ -213,7 +203,6 @@ public class DashboardService {
     // =========================================================
 
     private BigDecimal calcularSaldoReal(UUID userId) {
-        // Filtra apenas contas operacionais (não investimento, não cartão)
         return accountRepository.findByOwnerId(userId).stream()
             .filter(acc ->
                 acc.getType() == AccountType.CHECKING ||
@@ -228,7 +217,6 @@ public class DashboardService {
     }
 
     private BigDecimal calcularSaldoCompartilhado(UUID userId, UUID partnerId) {
-        // Soma saldos das contas marcadas como shared de ambos
         List<Account> contasUsuario = accountRepository.findByOwnerIdAndSharedTrue(userId);
         List<Account> contasParceiro = accountRepository.findByOwnerIdAndSharedTrue(partnerId);
 
@@ -277,8 +265,10 @@ public class DashboardService {
 
     private BigDecimal calcularTotalRecorrentes(UUID userId) {
         return recurringRepository.findByAccountOwnerId(userId).stream()
-            .filter(r -> r.getType() == TransactionType.EXPENSE) // ← só despesas
-            .map(r -> r.getEstimatedAmount() != null ? r.getEstimatedAmount() : BigDecimal.ZERO)
+            .filter(r -> r.getType() == TransactionType.EXPENSE)
+            .map(r -> r.getEstimatedAmount() != null
+                ? r.getEstimatedAmount()
+                : BigDecimal.ZERO)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 

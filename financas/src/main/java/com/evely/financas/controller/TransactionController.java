@@ -24,25 +24,30 @@ public class TransactionController {
 
     @PostMapping
     public ResponseEntity<String> registrarTransacao(
-            @RequestBody Transaction transaction, 
+            @RequestBody Transaction transaction,
             @RequestParam(defaultValue = "1") int parcelas,
-            @AuthenticationPrincipal User user) { 
-        
+            @AuthenticationPrincipal User user) {
+
         transactionService.registrarTransacao(transaction, parcelas, user.getId());
-        
-        return ResponseEntity.status(201).body("Transação registrada com " + parcelas + " parcelas");
+        return ResponseEntity.status(201)
+            .body("Transação registrada com " + parcelas + " parcelas");
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> excluir (@PathVariable UUID id) {
-        transactionService.excluir(id);
+    public ResponseEntity<Void> excluir(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user) {
+        // userId agora é validado dentro do service (RN12 + segurança)
+        transactionService.excluir(id, user.getId());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/efetivar/{simulationId}")
-    public ResponseEntity<String> efetivarSimulacao (@PathVariable UUID simulationId) {
+    public ResponseEntity<String> efetivarSimulacao(
+            @PathVariable UUID simulationId) {
         transactionService.efetivarSimulacao(simulationId);
-
-        return ResponseEntity.status(200).body("Perfeito! Deixou de ser uma simulação e passou a ser uma transação real! Seu dashboard atualizou!");
+        return ResponseEntity.status(200)
+            .body("Perfeito! Deixou de ser uma simulação e passou a ser " +
+                  "uma transação real! Seu dashboard atualizou!");
     }
 }
