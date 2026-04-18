@@ -20,18 +20,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function signIn(email, password) {
-    try {
-      const response = await api.post('/auth/login', { email, password });
-      const { token, user } = response.data; // Ajusta conforme o retorno do teu Spring Boot
+    const response = await api.post('/auth/login', { email, password });
+    const { token } = response.data; // ← só token vem do backend
 
-      localStorage.setItem('@Rubi:token', token);
-      localStorage.setItem('@Rubi:user', JSON.stringify(user));
+    localStorage.setItem('@Rubi:token', token);
+    // Guarda o email como identificador mínimo até ter um endpoint /me
+    localStorage.setItem('@Rubi:user', JSON.stringify({ email }));
 
-      setUser(user);
-    } catch (error) {
-      console.error("Erro no login", error);
-      throw error;
-    }
+    setUser({ email });
   }
 
   function signOut() {

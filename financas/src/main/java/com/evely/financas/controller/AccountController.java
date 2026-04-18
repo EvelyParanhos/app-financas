@@ -3,12 +3,14 @@ package com.evely.financas.controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.evely.financas.model.Account;
+import com.evely.financas.model.User;
 import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.service.AccountService;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,10 +28,14 @@ public class AccountController {
     private final AccountService accountService;
     private final AccountRepository accountRepository;
 
+    // AccountController.java
     @PostMapping
-    public ResponseEntity<Account> salvar(@RequestBody Account account) {
+    public ResponseEntity<Account> salvar(
+            @RequestBody Account account,
+            @AuthenticationPrincipal User user) {  // ← adicione isso
+        account.setOwner(user);                    // ← e isso
         Account accountSalva = accountService.salvar(account);
-        return ResponseEntity.status(200).body(accountSalva);
+        return ResponseEntity.status(201).body(accountSalva);
     }
 
     @GetMapping

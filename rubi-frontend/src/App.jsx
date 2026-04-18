@@ -22,18 +22,20 @@ function PrivateRoute({ children }) {
 
 export function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/verify" element={<Verify />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        
-        {/* Em breve protegeremos esta rota com o AuthContext */}
-        <Route path="/dashboard" element={<Dashboard />} /> 
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/verify" element={<Verify />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/dashboard" element={
+            <PrivateRoute><Dashboard /></PrivateRoute> 
+          } />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

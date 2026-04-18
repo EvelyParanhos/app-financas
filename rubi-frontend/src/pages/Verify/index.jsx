@@ -20,18 +20,13 @@ export function Verify() {
     if (!v && i > 0) refs.current[i-1]?.focus();
   };
 
+  // Verify/index.jsx
   const handleVerify = async () => {
-    const fullCode = code.join("");
-    if (fullCode.length < 6) return alert("Digite o código completo!");
-    if (!email) return alert("Erro interno: Email não encontrado.");
-
     try {
       setLoading(true);
-      // Chama o endpoint de verificação do Java
       await api.post('/users/verificar', { email, code: fullCode });
-      
-      alert("Conta ativada com sucesso! Faça login.");
-      navigate('/login'); // Conta ativada, manda pro login!
+      // Após verificar, vai direto pro onboarding passando o email
+      navigate('/onboarding', { state: { email, fromVerify: true } });
     } catch (error) {
       alert(error.response?.data?.message || "Código inválido ou expirado.");
     } finally {
