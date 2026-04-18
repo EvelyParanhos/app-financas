@@ -9,24 +9,20 @@ import lombok.Data;
 @AllArgsConstructor
 public class DashboardDTO {
 
-    // --- Cards principais ---
+// --- Cards principais ---
     private BigDecimal currentBalance;        // saldo real disponível agora
     private BigDecimal committedAmount;       // total de parcelas PENDING do mês
     private BigDecimal projectedLeftover;     // currentBalance - committedAmount
     private BigDecimal totalToReceive;        // empréstimos a receber
+    private BigDecimal investedBalance;       // NOVO: saldo total em contas de investimento
 
-    // --- Cartões de crédito ---
-    private List<InvoiceSummaryDTO> pendingInvoices;  // faturas em aberto
-
-    // --- Parcelas do mês (checklist da Home) ---
+    // --- Listas da Home ---
+    private List<InvoiceSummaryDTO> pendingInvoices;  
     private List<InstallmentItemDTO> installmentsDueThisMonth;
+    private List<TransactionItemDTO> recentTransactions; // NOVO: Últimos lançamentos
 
-    // --- Budgets do mês ---
+    // --- Extras ---
     private List<BudgetStatusDTO> budgetStatus;
-
-    // --- Projeção de 12 meses ---
     private List<MonthProjectionDTO> projection;
-
-    // --- Flag ---
     private boolean hasPartner;
 }

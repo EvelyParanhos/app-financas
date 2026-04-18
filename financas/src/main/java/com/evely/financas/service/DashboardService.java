@@ -31,6 +31,8 @@ public class DashboardService {
     private final RecurringTransactionRepository recurringRepository;
     private final LoanRepository loanRepository;
     private final BudgetService budgetService;
+    private final TransactionRepository transactionRepository; 
+    
 
     // =========================================================
     // DASHBOARD PRINCIPAL
@@ -40,52 +42,44 @@ public class DashboardService {
         LocalDate inicio = LocalDate.of(year, month, 1);
         LocalDate fim = inicio.with(TemporalAdjusters.lastDayOfMonth());
 
-        // 1. Saldo real — soma dos snapshots mais recentes das contas não-investimento
         BigDecimal currentBalance = calcularSaldoReal(userId);
-
-        // 2. Total comprometido no mês (parcelas PENDING, excluindo simulações)
-        BigDecimal committed = installmentRepository.somarDividasComFiltro(
-            userId, inicio, fim, false
-        );
+        BigDecimal committed = installmentRepository.somarDividasComFiltro(userId, inicio, fim, false);
         if (committed == null) committed = BigDecimal.ZERO;
-
-        // 3. Sobra projetada
+        
         BigDecimal leftover = currentBalance.subtract(committed);
-
-        // 4. Total a receber de empréstimos
+        
         BigDecimal toReceive = loanRepository.totalAReceber(userId);
         if (toReceive == null) toReceive = BigDecimal.ZERO;
 
-        // 5. Faturas de cartão pendentes
+        // NOVO: 5. Saldo Investido
+        BigDecimal investedBalance = calcularSaldoInvestido(userId);
+
         List<InvoiceSummaryDTO> invoices = buildInvoiceSummaries(userId);
+        
+        List<InstallmentItemDTO> installmentItems = installmentRepository
+            .findPendingWithDetailsByUserAndPeriod(userId, inicio, fim)
+            .stream().map(this::toInstallmentItem).toList();
 
-        // 6. Parcelas do mês com detalhes (checklist)
-        // JOIN FETCH — uma query só, sem N+1
-        List<Installment> parcelas = installmentRepository
-            .findPendingWithDetailsByUserAndPeriod(userId, inicio, fim);
-        List<InstallmentItemDTO> installmentItems = parcelas.stream()
-            .map(this::toInstallmentItem)
-            .toList();
+        // NOVO: 6. Últimos Lançamentos (Top 5)
+        List<TransactionItemDTO> recentTransactions = transactionRepository
+            .findTop5ByAccountOwnerIdOrderByPurchaseDateDesc(userId)
+            .stream()
+            .map(t -> new TransactionItemDTO(
+                t.getId(),
+                t.getDescription(),
+                t.getCategory() != null ? t.getCategory().getName() : "Sem Categoria",
+                t.getTotalAmount(),
+                t.getPurchaseDate(),
+                t.getType().name()
+            )).toList();
 
-        // 7. Status dos budgets
         List<BudgetStatusDTO> budgets = budgetService.getStatusDoMes(userId, month, year);
-
-        // 8. Projeção de 12 meses
         List<MonthProjectionDTO> projection = buildProjection(userId, month, year);
-
-        // 9. Verifica se tem parceiro
         boolean hasPartner = partnershipRepository.findByUserId(userId).isPresent();
 
         return new DashboardDTO(
-            currentBalance,
-            committed,
-            leftover,
-            toReceive,
-            invoices,
-            installmentItems,
-            budgets,
-            projection,
-            hasPartner
+            currentBalance, committed, leftover, toReceive, investedBalance, 
+            invoices, installmentItems, recentTransactions, budgets, projection, hasPartner
         );
     }
 
@@ -196,16 +190,21 @@ public class DashboardService {
         List<BudgetStatusDTO> budgets = budgetService.getStatusDoMes(userId, month, year);
         List<MonthProjectionDTO> projection = buildProjection(userId, month, year);
 
+        // Calculamos o investido do casal de forma simples
+        BigDecimal investedUsuario = calcularSaldoInvestido(userId);
+        BigDecimal investedParceiro = calcularSaldoInvestido(partnerId);
+        BigDecimal totalInvested = investedUsuario.add(investedParceiro);
+
+        // Lançamentos recentes do usuário
+        List<TransactionItemDTO> recentTransactions = transactionRepository
+            .findTop5ByAccountOwnerIdOrderByPurchaseDateDesc(userId)
+            .stream()
+            .map(t -> new TransactionItemDTO(t.getId(), t.getDescription(), t.getCategory() != null ? t.getCategory().getName() : "Sem Categoria", t.getTotalAmount(), t.getPurchaseDate(), t.getType().name()))
+            .toList();
+
         return new DashboardDTO(
-            saldoCompartilhado,
-            totalCommitted,
-            leftover,
-            toReceive.add(toReceiveParceiro),
-            invoices,
-            installmentItems,
-            budgets,
-            projection,
-            true
+            saldoCompartilhado, totalCommitted, leftover, toReceive.add(toReceiveParceiro), totalInvested,
+            invoices, installmentItems, recentTransactions, budgets, projection, true
         );
     }
 
@@ -280,6 +279,17 @@ public class DashboardService {
         return recurringRepository.findByAccountOwnerId(userId).stream()
             .filter(r -> r.getType() == TransactionType.EXPENSE) // ← só despesas
             .map(r -> r.getEstimatedAmount() != null ? r.getEstimatedAmount() : BigDecimal.ZERO)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal calcularSaldoInvestido(UUID userId) {
+        return accountRepository.findByOwnerId(userId).stream()
+            .filter(acc -> acc.getType() == AccountType.INVESTMENT)
+            .map(acc -> snapshotRepository
+                .findFirstByAccountOrderBySnapshotDateDesc(acc)
+                .map(Snapshot::getAmount)
+                .orElse(BigDecimal.ZERO)
+            )
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }
