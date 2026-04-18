@@ -129,7 +129,7 @@ export function Onboarding() {
             <div key={i} style={{flex:1,height:4,borderRadius:4,background:i<=curr?"var(--teal)":"#e8e4e8",transition:"all .3s"}} />
           ))}
         </div>
-        <p style={{fontSize:12,fontWeight:600,color:"var(--teal)",letterSpacing:".08em",marginBottom:8}}>PASSO {step} DE 3</p>
+        <p style={{fontSize:12,fontWeight:600,color:"var(--teal)",letterSpacing:".08em",marginBottom:8}}>PASSO {step} DE 4</p>
 
         {/* PASSO 1 - CONTAS CORRENTES */}
         {step===1 && <>

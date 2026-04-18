@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import { 
   User, CreditCard, Target, MessageSquare, 
   Plus, Trash2, Link2, Copy, Pencil, Wallet,
@@ -7,13 +7,21 @@ import {
 import { Button } from "../../components/Button";
 import { Input } from "../../components/Input";
 import { AuthContext } from "../../context/AuthContext";
+import { api } from "../../services/api"; // <-- O import vital que faltava!
 
 export function Settings() {
   const { user } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState("accounts");
   
-  // Estado temporário para simular a geração do código de convite
   const [inviteCode, setInviteCode] = useState(null);
+  const [accounts, setAccounts] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+
+  // Busca os dados da API para preencher a tela
+  useEffect(() => {
+    api.get('/accounts').then(res => setAccounts(res.data)).catch(console.error);
+    api.get('/budgets').then(res => setBudgets(res.data)).catch(console.error);
+  }, []);
 
   const tabs = [
     { id: "accounts", label: "Contas e Cartões", icon: CreditCard },
@@ -23,12 +31,10 @@ export function Settings() {
   ];
 
   const handleGenerateCode = () => {
-    // Chamada futura: api.post('/partnership/invite')
     setInviteCode("RB-8291"); 
   };
 
   return (
-    // Adicionado padding de 40px 48px para desgrudar do topo e das laterais
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", padding: "40px 48px" }}>
       
       <div style={{ marginBottom: 32 }}>
@@ -59,53 +65,53 @@ export function Settings() {
         {/* CONTEÚDO DINÂMICO */}
         <div style={{ flex: 1, background: "var(--white)", borderRadius: 16, padding: 32, boxShadow: "0 2px 12px rgba(96,80,99,.05)", overflowY: "auto" }}>
           
-          {/* ABA 1: CONTAS E CARTÕES (Dividido em Colunas) */}
+          {/* ABA 1: CONTAS E CARTÕES */}
           {activeTab === "accounts" && (
             <div className="fadeUp" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
               
-              {/* Coluna Contas */}
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                   <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--dark)" }}>Contas Bancárias</h2>
                   <Button variant="ghost" style={{ padding: "6px 12px", fontSize: 12 }}><Plus size={14} /> Adicionar</Button>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {["Nubank Corrente", "Cofre da Casa"].map((acc, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", border: "1px solid #f0edf0", borderRadius: 12 }}>
+                  {accounts.filter(acc => acc.type === 'CHECKING' || acc.type === 'CASH').map((acc) => (
+                    <div key={acc.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", border: "1px solid #f0edf0", borderRadius: 12 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--cream)", display: "flex", alignItems: "center", justifyContent: "center" }}><Wallet size={18} color="var(--teal)" /></div>
-                        <span style={{ fontWeight: 600, fontSize: 14, color: "var(--dark)" }}>{acc}</span>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: "var(--dark)" }}>{acc.name}</span>
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
-                        <button style={{ color: "var(--gray)", background: "transparent", cursor: "pointer" }}><Pencil size={16} /></button>
-                        <button style={{ color: "var(--danger)", background: "transparent", cursor: "pointer", opacity: 0.7 }}><Trash2 size={16} /></button>
+                        <button style={{ color: "var(--gray)", background: "transparent", cursor: "pointer", border: "none" }}><Pencil size={16} /></button>
+                        <button style={{ color: "var(--danger)", background: "transparent", cursor: "pointer", opacity: 0.7, border: "none" }}><Trash2 size={16} /></button>
                       </div>
                     </div>
                   ))}
+                  {accounts.length === 0 && <p style={{fontSize: 13, color: "var(--gray)"}}>Nenhuma conta encontrada.</p>}
                 </div>
               </div>
 
-              {/* Coluna Cartões */}
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                   <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--dark)" }}>Cartões de Crédito</h2>
                   <Button variant="ghost" style={{ padding: "6px 12px", fontSize: 12 }}><Plus size={14} /> Adicionar</Button>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {["Cartão Nubank"].map((card, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", border: "1px solid #f0edf0", borderRadius: 12 }}>
+                  {accounts.filter(acc => acc.type === 'CREDIT_CARD').map((card) => (
+                    <div key={card.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", border: "1px solid #f0edf0", borderRadius: 12 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <div style={{ width: 36, height: 36, borderRadius: 8, background: "#fdf3f3", display: "flex", alignItems: "center", justifyContent: "center" }}><CreditCard size={18} color="var(--danger)" /></div>
                         <div>
-                          <p style={{ fontWeight: 600, fontSize: 14, color: "var(--dark)" }}>{card}</p>
-                          <p style={{ fontSize: 12, color: "var(--gray)" }}>Vence dia 12</p>
+                          <p style={{ fontWeight: 600, fontSize: 14, color: "var(--dark)" }}>{card.name}</p>
+                          <p style={{ fontSize: 12, color: "var(--gray)" }}>Vence dia {card.dueDay || "--"}</p>
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
-                        <button style={{ color: "var(--gray)", background: "transparent", cursor: "pointer" }}><Pencil size={16} /></button>
+                        <button style={{ color: "var(--gray)", background: "transparent", cursor: "pointer", border: "none" }}><Pencil size={16} /></button>
                       </div>
                     </div>
                   ))}
+                  {accounts.filter(acc => acc.type === 'CREDIT_CARD').length === 0 && <p style={{fontSize: 13, color: "var(--gray)"}}>Nenhum cartão cadastrado.</p>}
                 </div>
               </div>
 
@@ -114,50 +120,13 @@ export function Settings() {
 
           {/* ABA 2: ORÇAMENTOS E FIXOS */}
           {activeTab === "budgets" && (
-            <div className="fadeUp" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
-              
-              {/* Coluna Orçamentos */}
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--dark)" }}>Limites (Orçamentos)</h2>
-                  <Button variant="ghost" style={{ padding: "6px 12px", fontSize: 12 }}><Plus size={14} /> Adicionar</Button>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {[{ name: "Lazer", limit: "R$ 500,00" }, { name: "Mercado", limit: "R$ 1.200,00" }].map((b, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", border: "1px solid #f0edf0", borderRadius: 12 }}>
-                      <span style={{ fontWeight: 600, fontSize: 14, color: "var(--dark)" }}>{b.name}</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                        <span style={{ fontSize: 14, color: "var(--teal)", fontWeight: 600 }}>{b.limit}</span>
-                        <button style={{ color: "var(--gray)", background: "transparent", cursor: "pointer" }}><Pencil size={16} /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Coluna Gastos Fixos */}
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--dark)" }}>Gastos Fixos</h2>
-                  <Button variant="ghost" style={{ padding: "6px 12px", fontSize: 12 }}><Plus size={14} /> Adicionar</Button>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {[{ name: "Aluguel", val: "R$ 1.500,00" }, { name: "Internet", val: "R$ 120,00" }].map((f, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", border: "1px solid #f0edf0", borderRadius: 12 }}>
-                      <span style={{ fontWeight: 600, fontSize: 14, color: "var(--dark)" }}>{f.name}</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                        <span style={{ fontSize: 14, color: "var(--danger)", fontWeight: 600 }}>{f.val}</span>
-                        <button style={{ color: "var(--gray)", background: "transparent", cursor: "pointer" }}><Pencil size={16} /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-            </div>
+             <div className="fadeUp">
+               <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--dark)", marginBottom: 16 }}>Orçamentos e Metas</h2>
+               <p style={{ fontSize: 14, color: "var(--gray)" }}>Integração com a API de Orçamentos em breve...</p>
+             </div>
           )}
 
-          {/* ABA 3: PARCEIRO (Com botão de Geração) */}
+          {/* ABA 3: PARCEIRO */}
           {activeTab === "partner" && (
             <div className="fadeUp" style={{ maxWidth: 450 }}>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--dark)", marginBottom: 8 }}>Gestão Compartilhada</h2>
@@ -192,15 +161,13 @@ export function Settings() {
           {activeTab === "telegram" && (
             <div className="fadeUp" style={{ maxWidth: 550 }}>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--dark)", marginBottom: 8 }}>Integração com Telegram</h2>
-              <p style={{ fontSize: 13, color: "var(--gray)", marginBottom: 24 }}>Registre gastos instantaneamente enviando mensagens de texto para o Bot Rubi.</p>
-              
               <div style={{ display: "flex", gap: 16, alignItems: "center", padding: 20, background: "#f0f7ff", border: "1px solid #d0e4ff", borderRadius: 12 }}>
                 <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#0088cc", display: "flex", alignItems: "center", justifyContent: "center" }}>
                    <MessageSquare size={22} color="white" />
                 </div>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontWeight: 600, color: "#004a80", fontSize: 15 }}>Status: Desconectado</p>
-                  <p style={{ fontSize: 13, color: "#6688aa", marginTop: 2 }}>Gere um PIN de uso único para autorizar o seu chat no aplicativo.</p>
+                  <p style={{ fontSize: 13, color: "#6688aa", marginTop: 2 }}>Gere um PIN de uso único para autorizar o seu chat.</p>
                 </div>
                 <Button style={{ background: "#0088cc", color: "white" }}>Gerar PIN</Button>
               </div>

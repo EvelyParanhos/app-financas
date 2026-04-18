@@ -10,6 +10,7 @@ import { Verify } from './pages/Verify';
 import { Onboarding } from './pages/Onboarding';
 import { Dashboard } from './pages/Dashboard'; 
 import { Settings } from './pages/Settings';
+import { Reports } from './pages/Reports';
 
 // Componente que blinda as rotas privadas
 function PrivateRoute({ children }) {
@@ -33,6 +34,7 @@ export function App() {
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute> } />
           <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+          <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

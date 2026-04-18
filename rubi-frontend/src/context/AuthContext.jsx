@@ -1,4 +1,3 @@
-
 import { createContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
 
@@ -14,28 +13,28 @@ export function AuthProvider({ children }) {
 
     if (token && storedUser) {
       setUser(JSON.parse(storedUser));
-      // Revalida o token buscando dados frescos do usuário
-      api.get('/users/me').then(res => {
-        const fresh = { id: res.data.id, name: res.data.name, email: res.data.email };
-        localStorage.setItem('@Rubi:user', JSON.stringify(fresh));
-        setUser(fresh);
-      }).catch(() => {
-        // Token expirado — faz logout silencioso
-        localStorage.removeItem('@Rubi:token');
-        localStorage.removeItem('@Rubi:user');
-        setUser(null);
-      });
+      
+      // Revalida o token buscando dados frescos
+      api.get('/users/me', { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => {
+          const fresh = { id: res.data.id, name: res.data.name, email: res.data.email, partnerId: res.data.partnerId };
+          localStorage.setItem('@Rubi:user', JSON.stringify(fresh));
+          setUser(fresh);
+        }).catch(() => {
+          signOut();
+        }).finally(() => {
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   async function signIn(email, password) {
     const response = await api.post('/auth/login', { email, password });
     const { token } = response.data;
-
     localStorage.setItem('@Rubi:token', token);
     
-    // Busca os dados reais do usuário com o token recém recebido
     const userResponse = await api.get('/users/me', {
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -44,9 +43,24 @@ export function AuthProvider({ children }) {
       id: userResponse.data.id,
       name: userResponse.data.name,
       email: userResponse.data.email,
+      partnerId: userResponse.data.partnerId,
+      inviteCode: userResponse.data.inviteCode
     };
 
     localStorage.setItem('@Rubi:user', JSON.stringify(userData));
     setUser(userData);
-  };
+  }
+
+  function signOut() {
+    localStorage.removeItem('@Rubi:token');
+    localStorage.removeItem('@Rubi:user');
+    setUser(null);
+  }
+
+  // O RETURN QUE FALTAVA PARA A TELA NÃO FICAR AMARELA!
+  return (
+    <AuthContext.Provider value={{ isAuthenticated: !!user, user, loading, signIn, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
