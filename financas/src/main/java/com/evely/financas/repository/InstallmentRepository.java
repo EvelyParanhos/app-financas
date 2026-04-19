@@ -15,8 +15,6 @@ import com.evely.financas.model.Installment;
 @Repository
 public interface InstallmentRepository extends JpaRepository<Installment, UUID> {
 
-    // Parcelas do mês — JOIN FETCH traz transaction e category em uma query só
-    // Sem isso: 1 query para parcelas + N queries para cada transaction + N para category
     @Query("""
         SELECT i FROM Installment i
         JOIN FETCH i.transaction t
@@ -33,7 +31,6 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
         @Param("fim") LocalDate fim
     );
 
-    // Projeção dos próximos N meses — real e simulação separados
     @Query("""
         SELECT MONTH(i.dueDate), YEAR(i.dueDate),
                SUM(CASE WHEN t.isSimulation = false THEN i.amount ELSE 0 END),
@@ -43,6 +40,7 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
         WHERE i.payer.id = :userId
         AND i.status = 'PENDING'
         AND i.dueDate BETWEEN :inicio AND :fim
+        AND t.type NOT IN ('INCOME', 'TRANSFER', 'INTERNAL_REPAYMENT')
         GROUP BY MONTH(i.dueDate), YEAR(i.dueDate)
         ORDER BY YEAR(i.dueDate), MONTH(i.dueDate)
     """)
@@ -77,7 +75,49 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
         @Param("fim") LocalDate fim
     );
 
-    
+    /**
+     * Soma as DESPESAS pendentes do usuário no período.
+     * EXCLUI: INCOME, TRANSFER e INTERNAL_REPAYMENT — esses não são dívidas.
+     */
+    @Query("""
+        SELECT COALESCE(SUM(i.amount), 0)
+        FROM Installment i
+        JOIN i.transaction t
+        WHERE i.payer.id = :userId
+        AND i.status = 'PENDING'
+        AND i.dueDate BETWEEN :inicio AND :fim
+        AND (:incluirSimulacoes = true OR t.isSimulation = false)
+        AND t.type NOT IN ('INCOME', 'TRANSFER', 'INTERNAL_REPAYMENT')
+    """)
+    BigDecimal somarDividasComFiltro(
+        @Param("userId") UUID userId,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim,
+        @Param("incluirSimulacoes") boolean incluirSimulacoes
+    );
+
+    /**
+     * Soma as RECEITAS previstas (INCOME) no período — para calcular sobra projetada.
+     */
+    @Query("""
+        SELECT COALESCE(SUM(i.amount), 0)
+        FROM Installment i
+        JOIN i.transaction t
+        WHERE i.payer.id = :userId
+        AND i.dueDate BETWEEN :inicio AND :fim
+        AND t.isSimulation = false
+        AND t.type = 'INCOME'
+    """)
+    BigDecimal somarReceitasPrevistas(
+        @Param("userId") UUID userId,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim
+    );
+
+    /**
+     * Soma despesas pendentes de contas compartilhadas (dashboard casal).
+     * Também exclui INCOME/TRANSFER/INTERNAL_REPAYMENT.
+     */
     @Query("""
         SELECT COALESCE(SUM(i.amount), 0)
         FROM Installment i
@@ -87,13 +127,14 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
         AND i.dueDate BETWEEN :inicio AND :fim
         AND t.isSimulation = false
         AND t.account.shared = true
+        AND t.type NOT IN ('INCOME', 'TRANSFER', 'INTERNAL_REPAYMENT')
     """)
     BigDecimal somarDividasComFiltroEContaShared(
         @Param("userId") UUID userId,
         @Param("inicio") LocalDate inicio,
         @Param("fim") LocalDate fim
     );
-    
+
     @Query("""
         SELECT i FROM Installment i
         JOIN FETCH i.transaction t
@@ -117,22 +158,6 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
         AND i.status = 'PAID'
     """)
     boolean existeParcellaPagaParaTransacao(@Param("transactionId") UUID transactionId);
-
-    @Query("""
-        SELECT COALESCE(SUM(i.amount), 0)
-        FROM Installment i
-        JOIN i.transaction t
-        WHERE i.payer.id = :userId
-        AND i.status = 'PENDING'
-        AND i.dueDate BETWEEN :inicio AND :fim
-        AND (:incluirSimulacoes = true OR t.isSimulation = false)
-    """)
-    BigDecimal somarDividasComFiltro(
-        @Param("userId") UUID userId,
-        @Param("inicio") LocalDate inicio,
-        @Param("fim") LocalDate fim,
-        @Param("incluirSimulacoes") boolean incluirSimulacoes
-    );
 
     @Modifying
     @jakarta.transaction.Transactional

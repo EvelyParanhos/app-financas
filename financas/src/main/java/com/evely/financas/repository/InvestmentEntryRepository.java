@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import com.evely.financas.enums.InvestmentEntryType;
 import com.evely.financas.model.InvestmentEntry;
+import org.springframework.data.jpa.repository.Query;
 
 @Repository
 public interface InvestmentEntryRepository extends JpaRepository<InvestmentEntry, UUID> {
@@ -47,4 +48,8 @@ public interface InvestmentEntryRepository extends JpaRepository<InvestmentEntry
         ORDER BY YEAR(e.entryDate) DESC, MONTH(e.entryDate) DESC
     """)
     List<Object[]> monthlyHistoryByAccount(@Param("accountId") UUID accountId);
+
+    @Query("SELECT SUM(e.depositAmount) FROM InvestmentEntry e WHERE e.userId = :userId AND e.month = :month AND e.year = :year")
+    BigDecimal somarAportesMensais(UUID userId, int month, int year);
+
 }

@@ -1,19 +1,17 @@
 package com.evely.financas.controller;
 
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import com.evely.financas.enums.AccountType;
 import com.evely.financas.model.Account;
 import com.evely.financas.model.RecurringTransaction;
 import com.evely.financas.model.User;
 import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.RecurringTransactionRepository;
+import com.evely.financas.service.RecurringTransactionService;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -23,12 +21,12 @@ public class RecurringTransactionController {
 
     private final RecurringTransactionRepository recurringRepository;
     private final AccountRepository accountRepository;
+    private final RecurringTransactionService recurringTransactionService;
 
     @PostMapping
     public ResponseEntity<RecurringTransaction> criar(
             @RequestBody RecurringTransaction rt,
             @AuthenticationPrincipal User user) {
-        // Se não vier com conta, associa à carteira padrão
         if (rt.getAccount() == null) {
             Account carteira = accountRepository
                 .findByOwnerId(user.getId())
@@ -44,5 +42,21 @@ public class RecurringTransactionController {
     @GetMapping
     public ResponseEntity<List<RecurringTransaction>> listar(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(recurringRepository.findByAccountOwnerId(user.getId()));
+    }
+
+    /**
+     * Materializa um item recorrente virtual para o mês/ano indicado.
+     * Chamado quando o usuário marca um item fixo do checklist como pago.
+     *
+     * POST /api/recurring/{id}/materialize?month=4&year=2026
+     */
+    @PostMapping("/{id}/materialize")
+    public ResponseEntity<String> materializar(
+            @PathVariable UUID id,
+            @RequestParam int month,
+            @RequestParam int year,
+            @AuthenticationPrincipal User user) {
+        recurringTransactionService.materializarParaMes(id, month, year, user.getId());
+        return ResponseEntity.ok("Transação recorrente registrada com sucesso.");
     }
 }

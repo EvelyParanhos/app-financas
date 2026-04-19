@@ -38,10 +38,11 @@ public class TransactionService {
         Account conta = accountRepository.findById(transacao.getAccount().getId())
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
         transacao.setAccount(conta);
-        
+
         boolean ehCartao = conta.getType() == AccountType.CREDIT_CARD;
         User pagador = userRepository.findById(userId)
             .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado"));
+
         if (!transacao.isSimulation() && !pagador.getStatus().equals(UserStatus.ACTIVE)) {
             throw new RuntimeException(
                 "Sua conta precisa estar ATIVA para registrar gastos reais.");
@@ -100,21 +101,17 @@ public class TransactionService {
         // ----------------------------------------------------------------
         // RN01 — Regra de Efeito de Liquidação
         //
-        // Apenas TRANSFER e compras em CARTÃO afetam o saldo imediatamente.
+        // CREDIT_CARD: baixa o limite disponível do cartão imediatamente.
+        // TRANSFER:    move saldo entre contas imediatamente.
         //
-        // - TRANSFER: o dinheiro sai e entra nas contas na hora (RN03).
-        // - CREDIT_CARD: baixa o limite disponível do cartão na hora,
-        //   mas NÃO afeta o saldo bancário (RN02). O saldo bancário só
-        //   é afetado quando a fatura é paga (pagarFatura).
-        // - EXPENSE / INCOME em conta corrente ou carteira: o saldo só
-        //   muda quando a parcela é marcada como PAGA (pagarParcela).
-        //   Isso representa boletos, contas e recebimentos futuros.
+        // EXPENSE / INCOME em conta corrente ou carteira:
+        //   O saldo SÓ muda quando a parcela for marcada como PAGA
+        //   pelo usuário no checklist (pagarParcela).
+        //   Isso aplica tanto para pagamentos à vista quanto parcelados,
+        //   garantindo que o checklist seja a única fonte de verdade.
         // ----------------------------------------------------------------
-        // --- Substitua o bloco if (!transacaoSalva.isSimulation()) existente por este: ---
-
         if (!transacaoSalva.isSimulation()) {
             if (ehCartao) {
-                // Cartão: baixa o limite disponível imediatamente
                 balanceService.baixarSaldo(
                     transacaoSalva.getAccount(),
                     transacaoSalva.getTotalAmount()
@@ -125,26 +122,16 @@ public class TransactionService {
                     transacaoSalva.getDestinationAccount(),
                     transacaoSalva.getTotalAmount()
                 );
-            } else if (totalParcelas == 1) {
-                // Pagamento à vista: saldo muda na hora e parcela já nasce PAID
-                Installment unica = transacaoSalva.getInstallments().get(0);
-                if (transacaoSalva.getType() == TransactionType.EXPENSE
-                        || transacaoSalva.getType() == TransactionType.LOAN_OUT) {
-                    balanceService.baixarSaldo(transacaoSalva.getAccount(), unica.getAmount());
-                } else if (transacaoSalva.getType() == TransactionType.INCOME) {
-                    balanceService.subirSaldo(transacaoSalva.getAccount(), unica.getAmount());
-                }
-                unica.setStatus(InstallmentStatus.PAID);
-                installmentRepository.save(unica);
             }
-            // totalParcelas > 1: saldo muda quando cada parcela for marcada como paga
+            // Para EXPENSE, INCOME e LOAN_OUT em conta corrente/carteira:
+            // parcelas ficam PENDING → saldo atualiza quando marcadas como pagas.
         }
 
-        return transacaoSalva;}
+        return transacaoSalva;
+    }
 
     @Transactional
     public void efetivarSimulacao(UUID transactionId) {
-        // 1º: busca a transação
         Transaction transacao = transactionRepository.findById(transactionId)
             .orElseThrow(() -> new ObjectNotFoundException("Simulação não encontrada!"));
 
@@ -152,7 +139,6 @@ public class TransactionService {
             throw new RuntimeException("Esta transação já é real!");
         }
 
-        // 2º: busca a conta completa usando o ID que a transação já tem
         Account conta = accountRepository.findById(transacao.getAccount().getId())
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
         transacao.setAccount(conta);
@@ -181,18 +167,8 @@ public class TransactionService {
                 transacao.getDestinationAccount(),
                 transacao.getTotalAmount()
             );
-        } else if (transacao.getInstallments().size() == 1) {
-            // Parcela única: efetivar saldo agora
-            Installment unica = transacao.getInstallments().get(0);
-            if (transacao.getType() == TransactionType.EXPENSE) {
-                balanceService.baixarSaldo(transacao.getAccount(), unica.getAmount());
-            } else if (transacao.getType() == TransactionType.INCOME) {
-                balanceService.subirSaldo(transacao.getAccount(), unica.getAmount());
-            }
-            unica.setStatus(InstallmentStatus.PAID);
-            installmentRepository.save(unica);
         }
-        // Parcelado (N > 1): saldo muda quando cada parcela for paga
+        // Para EXPENSE/INCOME parcelados: saldo muda quando cada parcela for paga
 
         transactionRepository.save(transacao);
     }
@@ -202,13 +178,10 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findById(id)
             .orElseThrow(() -> new ObjectNotFoundException("Transação não encontrada!"));
 
-        // Segurança: apenas o dono da conta pode excluir
         if (!transaction.getAccount().getOwner().getId().equals(userId)) {
-            throw new RuntimeException(
-                "Sem permissão para excluir esta transação.");
+            throw new RuntimeException("Sem permissão para excluir esta transação.");
         }
 
-        // RN12 — Bloqueio de eliminação com histórico
         boolean temParcelaPaga = installmentRepository
             .existeParcellaPagaParaTransacao(id);
 
@@ -218,7 +191,6 @@ public class TransactionService {
                 "Para desfazer, registre um estorno.");
         }
 
-        // RN13 — Eliminação em cascata limpa (cascade + orphanRemoval cuida das parcelas)
         transactionRepository.delete(transaction);
     }
 }

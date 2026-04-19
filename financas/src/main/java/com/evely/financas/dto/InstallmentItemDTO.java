@@ -20,6 +20,11 @@ public class InstallmentItemDTO {
     private InstallmentStatus status;
     private boolean isSimulation;
     private String payerName;
-    // null para parcelas reais; preenchido para recorrentes virtuais (não materializados ainda)
     private UUID recurringTransactionId;
+
+    /**
+     * Tipo da transação original: EXPENSE, INCOME, LOAN_OUT, etc.
+     * Permite que o frontend distinga "a pagar" de "a receber" no checklist.
+     */
+    private String transactionType;
 }
