@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import com.evely.financas.model.Transaction;
 import jakarta.transaction.Transactional;
@@ -38,5 +39,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
 
     boolean existsByDescriptionAndAccountIdAndPurchaseDateBetween(
     String description, UUID accountId, LocalDate start, LocalDate end
-);
+    );
+
+    // No TransactionRepository.java:
+    @Query("SELECT SUM(t.totalAmount) FROM Transaction t WHERE t.account.id = :accountId AND t.purchaseDate >= :inicio AND t.purchaseDate <= :fim AND t.isSimulation = false")
+    java.math.BigDecimal sumAmountByAccountAndPeriod(
+        @org.springframework.data.repository.query.Param("accountId") java.util.UUID accountId,
+        @org.springframework.data.repository.query.Param("inicio") java.time.LocalDate inicio,
+        @org.springframework.data.repository.query.Param("fim") java.time.LocalDate fim
+    );
 }
