@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   ChevronLeft, ChevronRight, Wallet, CreditCard, 
@@ -9,6 +9,7 @@ import { api } from "../../services/api";
 import { AuthContext } from "../../context/AuthContext";
 import { TransactionModal } from "../../components/TransactionModal";
 import { SimulatorModal } from "../../components/SimulatorModal";
+
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -31,21 +32,32 @@ export function Dashboard() {
   const prevMonth = () => setDate(new Date(year, date.getMonth() - 1, 1));
   const nextMonth = () => setDate(new Date(year, date.getMonth() + 1, 1));
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        setLoading(true);
-        // Busca os dados do endpoint que acabamos de refatorar no Java
-        const response = await api.get('/dashboard', { params: { month, year } });
-        setData(response.data);
-      } catch (error) {
-        console.error("Erro ao buscar dashboard:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDashboard();
+  // Substitua o useEffect e a função de fetch por:
+  const fetchDashboard = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/dashboard', { params: { month, year } });
+      setData(response.data);
+    } catch (error) {
+      console.error("Erro ao buscar dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
   }, [month, year]);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
+
+  // Adicione este handler logo abaixo:
+  const handlePayInstallment = async (installmentId) => {
+    try {
+      await api.patch(`/installments/${installmentId}/pay`);
+      fetchDashboard();
+    } catch (error) {
+      alert(error.response?.data?.message || "Erro ao registrar pagamento.");
+    }
+  };
 
   const handleLogout = () => {
     signOut();
@@ -186,16 +198,58 @@ export function Dashboard() {
               {(!loading && (!data?.installmentsDueThisMonth || data.installmentsDueThisMonth.length === 0)) ? (
                 <p style={{ fontSize: 13, color: "var(--gray)", textAlign: "center", marginTop: 40 }}>Tudo em dia! 🎉</p>
               ) : (
-                data?.installmentsDueThisMonth?.map((item) => (
-                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid #faf9fa" }}>
-                    <button style={{ minWidth: 20, height: 20, borderRadius: 6, background: item.status === 'PAID' ? "var(--teal)" : "transparent", border: item.status === 'PAID' ? "none" : "2px solid #e4e0e4", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                data?.installmentsDueThisMonth?.map((item, index) => (
+                  <div 
+                    key={item.installmentId || `rec-${item.recurringTransactionId || index}`}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid #faf9fa" }}
+                  >
+                    {/* Checkbox: só funcional para parcelas reais (com installmentId) */}
+                    <button 
+                      onClick={() => item.installmentId && handlePayInstallment(item.installmentId)}
+                      style={{ 
+                        minWidth: 20, height: 20, borderRadius: 6, 
+                        background: item.status === 'PAID' ? "var(--teal)" : "transparent", 
+                        border: item.status === 'PAID' ? "none" : "2px solid #e4e0e4",
+                        display: "flex", alignItems: "center", justifyContent: "center", 
+                        cursor: item.installmentId ? "pointer" : "default",
+                        opacity: item.installmentId ? 1 : 0.6
+                      }}
+                    >
                       {item.status === 'PAID' && <Check size={12} color="white" strokeWidth={3} />}
                     </button>
+
                     <div style={{ flex: 1, overflow: "hidden" }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: item.status === 'PAID' ? "var(--gray)" : "var(--dark)", textDecoration: item.status === 'PAID' ? "line-through" : "none", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{item.description}</p>
-                      <p style={{ fontSize: 11, color: "var(--gray)" }}>Vence: {item.dueDate}</p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <p style={{ 
+                          fontSize: 13, fontWeight: 600, 
+                          color: item.status === 'PAID' ? "var(--gray)" : item.recurringTransactionId ? "var(--deep)" : "var(--dark)", 
+                          textDecoration: item.status === 'PAID' ? "line-through" : "none", 
+                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" 
+                        }}>
+                          {item.transactionDescription}
+                        </p>
+                        {/* Badge visual para recorrentes virtuais */}
+                        {item.recurringTransactionId && (
+                          <span style={{ 
+                            fontSize: 10, fontWeight: 700, color: "var(--deep)", 
+                            background: "var(--cream)", borderRadius: 4, padding: "1px 5px", 
+                            whiteSpace: "nowrap" 
+                          }}>
+                            FIXO
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: 11, color: "var(--gray)" }}>
+                        {item.categoryName && `${item.categoryName} · `}Vence: {item.dueDate}
+                      </p>
                     </div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: item.status === 'PAID' ? "var(--gray)" : "var(--danger)" }}>{formatCurrency(item.amount)}</span>
+
+                    <span style={{ 
+                      fontSize: 13, fontWeight: 700, 
+                      color: item.status === 'PAID' ? "var(--gray)" : "var(--danger)" 
+                    }}>
+                      {formatCurrency(item.amount)}
+                    </span>
                   </div>
                 ))
               )}
@@ -260,7 +314,11 @@ export function Dashboard() {
       </div>
       
       {/* MODAIS (Invisíveis até serem chamados) */}
-      <TransactionModal isOpen={isTransModalOpen} onClose={() => setIsTransModalOpen(false)} />
+      <TransactionModal 
+        isOpen={isTransModalOpen} 
+        onClose={() => setIsTransModalOpen(false)} 
+        onSuccess={fetchDashboard}
+      />
       <SimulatorModal isOpen={isSimModalOpen} onClose={() => setIsSimModalOpen(false)} />
     </div>
   );

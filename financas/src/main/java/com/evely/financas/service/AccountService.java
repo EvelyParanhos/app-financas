@@ -6,14 +6,19 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import com.evely.financas.enums.AccountType;
+import com.evely.financas.enums.InvestmentEntryType;
 import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Account;
+import com.evely.financas.model.InvestmentEntry;
 import com.evely.financas.model.Snapshot;
 import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.SnapshotRepository;
 import com.evely.financas.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import com.evely.financas.enums.InvestmentEntryType;
+import com.evely.financas.model.InvestmentEntry;
+import com.evely.financas.repository.InvestmentEntryRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +27,7 @@ public class AccountService {
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;
     private final SnapshotRepository snapshotRepository;
+    private final InvestmentEntryRepository investmentEntryRepository;
 
     @Transactional
     public Account salvar(Account account) {
@@ -41,11 +47,22 @@ public class AccountService {
             criarSnapshot(salva, limiteInicial);
 
         } else {
-            // Contas comuns (CHECKING, CASH, INVESTMENT): usa o saldo
-            // informado no campo transiente, ou zero se não informado.
             BigDecimal saldoInicial = account.getInitialBalance() != null
                 ? account.getInitialBalance()
                 : BigDecimal.ZERO;
+
+            // Para investimentos: cria InvestmentEntry em vez de (só) snapshot
+            // InvestmentService.calcularSaldo() lê InvestmentEntry, não snapshot
+            if (salva.getType() == AccountType.INVESTMENT && saldoInicial.compareTo(BigDecimal.ZERO) > 0) {
+                InvestmentEntry entryInicial = new InvestmentEntry();
+                entryInicial.setAccount(salva);
+                entryInicial.setType(InvestmentEntryType.DEPOSIT);
+                entryInicial.setAmount(saldoInicial);
+                entryInicial.setEntryDate(java.time.LocalDate.now());
+                entryInicial.setNotes("Saldo inicial");
+                investmentEntryRepository.save(entryInicial);
+            }
+
             criarSnapshot(salva, saldoInicial);
         }
 

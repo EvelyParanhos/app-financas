@@ -13,6 +13,7 @@ import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import com.evely.financas.dto.*;
 import com.evely.financas.enums.AccountType;
+import com.evely.financas.enums.InstallmentStatus;
 import com.evely.financas.enums.TransactionType;
 import com.evely.financas.model.*;
 import com.evely.financas.repository.*;
@@ -31,6 +32,7 @@ public class DashboardService {
     private final LoanRepository loanRepository;
     private final BudgetService budgetService;
     private final TransactionRepository transactionRepository;
+    private final InvestmentService investmentService;
 
     // =========================================================
     // DASHBOARD PRINCIPAL
@@ -56,7 +58,14 @@ public class DashboardService {
 
         List<InstallmentItemDTO> installmentItems = installmentRepository
             .findPendingWithDetailsByUserAndPeriod(userId, inicio, fim)
-            .stream().map(this::toInstallmentItem).toList();
+            .stream().map(this::toInstallmentItem).collect(java.util.stream.Collectors.toList());
+
+        // Adiciona os recorrentes que ainda não foram materializados neste mês
+        installmentItems.addAll(buildRecurrentesVirtuais(userId, inicio, fim));
+        installmentItems.sort(java.util.Comparator.comparing(
+            InstallmentItemDTO::getDueDate,
+            java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())
+        ));
 
         // RN14 — Simulações são invisíveis no histórico real
         List<TransactionItemDTO> recentTransactions = transactionRepository
@@ -250,18 +259,19 @@ public class DashboardService {
     }
 
     private InstallmentItemDTO toInstallmentItem(Installment i) {
-        Transaction t = i.getTransaction();
-        return new InstallmentItemDTO(
-            i.getId(),
-            t.getDescription(),
-            t.getCategory() != null ? t.getCategory().getName() : null,
-            i.getAmount(),
-            i.getDueDate(),
-            i.getStatus(),
-            t.isSimulation(),
-            i.getPayer().getName()
-        );
-    }
+    Transaction t = i.getTransaction();
+    return new InstallmentItemDTO(
+        i.getId(),
+        t.getDescription(),
+        t.getCategory() != null ? t.getCategory().getName() : null,
+        i.getAmount(),
+        i.getDueDate(),
+        i.getStatus(),
+        t.isSimulation(),
+        i.getPayer().getName(),
+        null  // recurringTransactionId = null para parcelas reais
+    );
+}
 
     private BigDecimal calcularTotalRecorrentes(UUID userId) {
         return recurringRepository.findByAccountOwnerId(userId).stream()
@@ -273,13 +283,51 @@ public class DashboardService {
     }
 
     private BigDecimal calcularSaldoInvestido(UUID userId) {
-        return accountRepository.findByOwnerId(userId).stream()
-            .filter(acc -> acc.getType() == AccountType.INVESTMENT)
-            .map(acc -> snapshotRepository
-                .findFirstByAccountOrderBySnapshotDateDesc(acc)
-                .map(Snapshot::getAmount)
-                .orElse(BigDecimal.ZERO)
-            )
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    BigDecimal total = BigDecimal.ZERO;
+    for (Account acc : accountRepository.findByOwnerId(userId)) {
+        if (acc.getType() == AccountType.INVESTMENT) {
+            total = total.add(investmentService.calcularSaldo(acc.getId()));
+        }
     }
+    return total;
+    }
+
+    private List<InstallmentItemDTO> buildRecurrentesVirtuais(UUID userId, LocalDate inicio, LocalDate fim) {
+    List<InstallmentItemDTO> virtuais = new ArrayList<>();
+
+    for (RecurringTransaction rt : recurringRepository.findByAccountOwnerId(userId)) {
+        if (rt.getType() != TransactionType.EXPENSE && rt.getType() != TransactionType.INCOME) {
+            continue;
+        }
+
+        // Evita duplicata: verifica se o scheduler já materializou este mês
+        String descMaterializada = "[RECORRENTE] " + rt.getDescription();
+        boolean jaMaterializada = transactionRepository
+            .existsByDescriptionAndAccountIdAndPurchaseDateBetween(
+                descMaterializada,
+                rt.getAccount().getId(),
+                inicio,
+                fim
+            );
+
+        if (!jaMaterializada) {
+            int dia = Math.min(rt.getDayOfMonth(), inicio.lengthOfMonth());
+            LocalDate vencimento = inicio.withDayOfMonth(dia);
+
+            virtuais.add(new InstallmentItemDTO(
+                null,                     // installmentId = null (item virtual)
+                rt.getDescription(),
+                rt.getCategory() != null ? rt.getCategory().getName() : "Fixo",
+                rt.getEstimatedAmount() != null ? rt.getEstimatedAmount() : BigDecimal.ZERO,
+                vencimento,
+                InstallmentStatus.PENDING,
+                false,
+                null,                     // payerName
+                rt.getId()                // recurringTransactionId — identifica no frontend
+            ));
+        }
+    }
+
+    return virtuais;
+}
 }

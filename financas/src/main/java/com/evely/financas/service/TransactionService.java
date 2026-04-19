@@ -17,6 +17,7 @@ import com.evely.financas.model.CreditCardInvoice;
 import com.evely.financas.model.Installment;
 import com.evely.financas.model.Transaction;
 import com.evely.financas.model.User;
+import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.InstallmentRepository;
 import com.evely.financas.repository.TransactionRepository;
 import com.evely.financas.repository.UserRepository;
@@ -29,13 +30,18 @@ public class TransactionService {
     private final InstallmentRepository installmentRepository;
     private final UserRepository userRepository;
     private final BalanceService balanceService;
+    private final AccountRepository accountRepository;
     private final CreditCardInvoiceService creditCardInvoiceService;
 
     @Transactional
     public Transaction registrarTransacao(Transaction transacao, int totalParcelas, UUID userId) {
+        Account conta = accountRepository.findById(transacao.getAccount().getId())
+            .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
+        transacao.setAccount(conta);
+        
+        boolean ehCartao = conta.getType() == AccountType.CREDIT_CARD;
         User pagador = userRepository.findById(userId)
-            .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado!"));
-
+            .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado"));
         if (!transacao.isSimulation() && !pagador.getStatus().equals(UserStatus.ACTIVE)) {
             throw new RuntimeException(
                 "Sua conta precisa estar ATIVA para registrar gastos reais.");
@@ -45,8 +51,6 @@ public class TransactionService {
                 && transacao.getDestinationAccount() == null) {
             throw new RuntimeException("Transferência exige uma conta de destino.");
         }
-
-        boolean ehCartao = transacao.getAccount().getType() == AccountType.CREDIT_CARD;
 
         BigDecimal valorParcela = transacao.getTotalAmount()
             .divide(BigDecimal.valueOf(totalParcelas), 2, RoundingMode.HALF_UP);
@@ -106,8 +110,11 @@ public class TransactionService {
         //   muda quando a parcela é marcada como PAGA (pagarParcela).
         //   Isso representa boletos, contas e recebimentos futuros.
         // ----------------------------------------------------------------
+        // --- Substitua o bloco if (!transacaoSalva.isSimulation()) existente por este: ---
+
         if (!transacaoSalva.isSimulation()) {
             if (ehCartao) {
+                // Cartão: baixa o limite disponível imediatamente
                 balanceService.baixarSaldo(
                     transacaoSalva.getAccount(),
                     transacaoSalva.getTotalAmount()
@@ -118,15 +125,26 @@ public class TransactionService {
                     transacaoSalva.getDestinationAccount(),
                     transacaoSalva.getTotalAmount()
                 );
+            } else if (totalParcelas == 1) {
+                // Pagamento à vista: saldo muda na hora e parcela já nasce PAID
+                Installment unica = transacaoSalva.getInstallments().get(0);
+                if (transacaoSalva.getType() == TransactionType.EXPENSE
+                        || transacaoSalva.getType() == TransactionType.LOAN_OUT) {
+                    balanceService.baixarSaldo(transacaoSalva.getAccount(), unica.getAmount());
+                } else if (transacaoSalva.getType() == TransactionType.INCOME) {
+                    balanceService.subirSaldo(transacaoSalva.getAccount(), unica.getAmount());
+                }
+                unica.setStatus(InstallmentStatus.PAID);
+                installmentRepository.save(unica);
             }
-            // EXPENSE e INCOME: saldo afetado apenas em pagarParcela()
+            // totalParcelas > 1: saldo muda quando cada parcela for marcada como paga
         }
 
-        return transacaoSalva;
-    }
+        return transacaoSalva;}
 
     @Transactional
     public void efetivarSimulacao(UUID transactionId) {
+        // 1º: busca a transação
         Transaction transacao = transactionRepository.findById(transactionId)
             .orElseThrow(() -> new ObjectNotFoundException("Simulação não encontrada!"));
 
@@ -134,13 +152,16 @@ public class TransactionService {
             throw new RuntimeException("Esta transação já é real!");
         }
 
-        boolean ehCartao = transacao.getAccount().getType() == AccountType.CREDIT_CARD;
+        // 2º: busca a conta completa usando o ID que a transação já tem
+        Account conta = accountRepository.findById(transacao.getAccount().getId())
+            .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
+        transacao.setAccount(conta);
 
+        boolean ehCartao = conta.getType() == AccountType.CREDIT_CARD;
         transacao.setSimulation(false);
 
         if (ehCartao) {
             balanceService.validarSaldo(transacao.getAccount(), transacao.getTotalAmount());
-
             for (Installment parcela : transacao.getInstallments()) {
                 LocalDate mesDaParcela = parcela.getDueDate().withDayOfMonth(1);
                 CreditCardInvoice invoice = creditCardInvoiceService.buscarOuCriarFatura(
@@ -152,20 +173,26 @@ public class TransactionService {
                 parcela.setInvoice(invoice);
                 installmentRepository.save(parcela);
             }
+            balanceService.baixarSaldo(transacao.getAccount(), transacao.getTotalAmount());
 
-            balanceService.baixarSaldo(
-                transacao.getAccount(),
-                transacao.getTotalAmount()
-            );
         } else if (transacao.getType() == TransactionType.TRANSFER) {
-            // Transferência: executa imediatamente ao efetivar
             balanceService.transferir(
                 transacao.getAccount(),
                 transacao.getDestinationAccount(),
                 transacao.getTotalAmount()
             );
+        } else if (transacao.getInstallments().size() == 1) {
+            // Parcela única: efetivar saldo agora
+            Installment unica = transacao.getInstallments().get(0);
+            if (transacao.getType() == TransactionType.EXPENSE) {
+                balanceService.baixarSaldo(transacao.getAccount(), unica.getAmount());
+            } else if (transacao.getType() == TransactionType.INCOME) {
+                balanceService.subirSaldo(transacao.getAccount(), unica.getAmount());
+            }
+            unica.setStatus(InstallmentStatus.PAID);
+            installmentRepository.save(unica);
         }
-        // EXPENSE / INCOME: saldo afetado apenas quando a parcela for paga
+        // Parcelado (N > 1): saldo muda quando cada parcela for paga
 
         transactionRepository.save(transacao);
     }

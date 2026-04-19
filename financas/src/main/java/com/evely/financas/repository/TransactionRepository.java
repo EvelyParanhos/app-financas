@@ -1,5 +1,6 @@
 package com.evely.financas.repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -34,4 +35,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     @Deprecated
     @Transactional
     Long deleteByIsSimulationTrueAndCreatedAtBefore(LocalDateTime dia);
+
+    boolean existsByDescriptionAndAccountIdAndPurchaseDateBetween(
+    String description, UUID accountId, LocalDate start, LocalDate end
+);
 }
