@@ -3,14 +3,13 @@ import { useNavigate } from "react-router-dom";
 import {
   ChevronLeft, ChevronRight, Wallet, CreditCard,
   TrendingUp, PiggyBank, Check, Circle, LogOut,
-  LayoutDashboard, Settings, Plus, Sparkles,
+  LayoutDashboard, Settings, Plus,
   ArrowDownRight, ArrowUpRight, ArrowRightLeft,
-  Download, PieChart, RefreshCw
+  Download, PieChart, RefreshCw, RefreshCcw, HandCoins
 } from "lucide-react";
 import { api } from "../../services/api";
 import { AuthContext } from "../../context/AuthContext";
 import { TransactionModal } from "../../components/TransactionModal";
-import { SimulatorModal } from "../../components/SimulatorModal";
 
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -26,8 +25,8 @@ const fmt = (val) =>
 function BalanceCard({ total, breakdown }) {
   const typeIcon = (type) =>
     type === "CASH"
-      ? { icon: "💵", label: "Carteira" }
-      : { icon: "🏦", label: "Corrente" };
+      ? { icon: <HandCoins size={12} color="var(--gray)" />, label: "Carteira" }
+      : { icon: <Wallet size={12} color="var(--gray)" />, label: "Corrente" };
 
   return (
     <div style={cardStyle}>
@@ -39,7 +38,7 @@ function BalanceCard({ total, breakdown }) {
       <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
         {(breakdown || []).map((acc, i) => (
           <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 11, color: "var(--gray)" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--gray)" }}>
               {typeIcon(acc.type).icon} {acc.name}
             </span>
             <span style={{ fontSize: 11, fontWeight: 700, color: "var(--dark)" }}>{fmt(acc.balance)}</span>
@@ -61,16 +60,20 @@ function CommittedCard({ total, fixed: fixedAmt, creditCard }) {
     <div style={cardStyle}>
       <div style={cardHeaderStyle}>
         <div style={iconBox("#fdf3f3")}><CreditCard size={14} color="var(--danger)" /></div>
-        <span style={labelStyle}>Comprometido</span>
+        <span style={labelStyle}>Comprometido do Mês</span>
       </div>
       <p style={valueStyle("var(--danger)")}>{fmt(total)}</p>
       <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 11, color: "var(--gray)" }}>🔁 Gastos fixos</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--gray)" }}>
+            <RefreshCw size={10} color="var(--gray)"/> Gastos fixos
+          </span>
           <span style={{ fontSize: 11, fontWeight: 700, color: "var(--gray)" }}>{fmt(fixedAmt)}</span>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 11, color: "var(--gray)" }}>💳 Faturas cartão</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--gray)" }}>
+            <CreditCard size={10} color="var(--gray)"/> Faturas do Mês
+          </span>
           <span style={{ fontSize: 11, fontWeight: 700, color: "var(--gray)" }}>{fmt(creditCard)}</span>
         </div>
       </div>
@@ -110,7 +113,6 @@ export function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isTransModalOpen, setIsTransModalOpen] = useState(false);
-  const [isSimModalOpen, setIsSimModalOpen] = useState(false);
 
   const prevMonth = () => setDate(new Date(year, date.getMonth() - 1, 1));
   const nextMonth = () => setDate(new Date(year, date.getMonth() + 1, 1));
@@ -184,9 +186,6 @@ export function Dashboard() {
             <button onClick={() => setIsTransModalOpen(true)} style={actionBtnStyle("var(--teal)")}>
               <Plus size={18} /> Novo Lançamento
             </button>
-            <button onClick={() => setIsSimModalOpen(true)} style={actionBtnStyle("transparent", "rgba(255,255,255,.1)", "1px solid rgba(255,255,255,.15)", "var(--mint)")}>
-              <Sparkles size={18} /> Bola de Cristal
-            </button>
           </div>
         </nav>
 
@@ -242,8 +241,8 @@ export function Dashboard() {
           {/* Card 2: Comprometido + breakdown */}
           <CommittedCard
             total={data?.committedAmount}
-            fixed={data?.fixedExpensesCommitted}
-            creditCard={data?.creditCardCommitted}
+            fixed={data?.fixedExpenses}
+            creditCard={data?.ccCommitted}
           />
 
           {/* Card 3: Sobra projetada */}
@@ -284,157 +283,122 @@ export function Dashboard() {
         {/* ── CORPO: 3 COLUNAS COM LISTAS ── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, flex: 1, overflow: "hidden", minHeight: 0 }}>
 
-          {/* Checklist */}
-          <ListCard title="Checklist do Mês">
-            {(!loading && !data?.installmentsDueThisMonth?.length)
-              ? <EmptyState>Tudo em dia! 🎉</EmptyState>
-              : data?.installmentsDueThisMonth?.map((item, idx) => {
-                  const isIncome = item.transactionType === "INCOME";
+          {/* COLUNA 1: Entradas (Receitas + Salário Fixo) */}
+          <ListCard title="Entradas Previstas">
+            {(!loading && !data?.installmentItems?.filter(i => i.transactionType === "INCOME").length)
+              ? <EmptyState>Nenhuma entrada prevista.</EmptyState>
+              : data?.installmentItems?.filter(i => i.transactionType === "INCOME").map((item, idx) => {
                   const isVirtual = !!item.recurringTransactionId;
                   const isPaid = item.status === "PAID";
                   return (
-                    <div key={item.installmentId || `v-${idx}`}
-                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #faf9fa" }}
-                    >
-                      {/* Checkbox / botão de ação */}
-                      <button
-                        onClick={() => {
-                          if (isPaid) return;
-                          if (item.installmentId) handlePayInstallment(item.installmentId);
-                          else if (isVirtual) handleMaterializeRecurring(item.recurringTransactionId, item.transactionType);
-                        }}
-                        style={{
-                          minWidth: 20, height: 20, borderRadius: 6,
-                          background: isPaid
-                            ? (isIncome ? "var(--teal)" : "var(--teal)")
-                            : "transparent",
-                          border: isPaid ? "none"
-                            : isIncome ? "2px solid var(--teal)" : "2px solid #e4e0e4",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          cursor: isPaid ? "default" : "pointer"
-                        }}
-                      >
+                    <div key={item.installmentId || `v-${idx}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #faf9fa" }}>
+                      <button onClick={() => { if (!isPaid) isVirtual ? handleMaterializeRecurring(item.recurringTransactionId, "INCOME") : handlePayInstallment(item.installmentId); }} style={checkBtnStyle(isPaid, "var(--teal)")}>
                         {isPaid && <Check size={12} color="white" strokeWidth={3} />}
                       </button>
-
-                      {/* Ícone de tipo */}
-                      <div style={{
-                        width: 20, height: 20, borderRadius: 4, flexShrink: 0,
-                        background: isIncome ? "#f0f8f7" : "#fdf3f3",
-                        display: "flex", alignItems: "center", justifyContent: "center"
-                      }}>
-                        {isIncome
-                          ? <ArrowUpRight size={12} color="var(--teal)" />
-                          : <ArrowDownRight size={12} color="var(--danger)" />}
-                      </div>
-
+                      <div style={iconBoxStyle("#f0f8f7")}><ArrowUpRight size={12} color="var(--teal)" /></div>
                       <div style={{ flex: 1, overflow: "hidden" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                          <p style={{
-                            fontSize: 12, fontWeight: 600,
-                            color: isPaid ? "var(--gray)" : "var(--dark)",
-                            textDecoration: isPaid ? "line-through" : "none",
-                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
-                          }}>
-                            {item.transactionDescription}
-                          </p>
-                          {isVirtual && (
-                            <span style={{ fontSize: 9, fontWeight: 700, color: "var(--deep)", background: "var(--cream)", borderRadius: 3, padding: "1px 4px", whiteSpace: "nowrap" }}>
-                              FIXO
-                            </span>
-                          )}
+                          <p style={itemTitleStyle(isPaid)}>{item.transactionDescription}</p>
+                          {isVirtual && <span style={virtualTagStyle("var(--teal)")}>FIXO</span>}
                         </div>
-                        <p style={{ fontSize: 10, color: "var(--gray)" }}>
-                          {item.categoryName ? `${item.categoryName} · ` : ""}
-                          Vence: {item.dueDate}
-                        </p>
+                        <p style={{ fontSize: 10, color: "var(--gray)" }}>{item.categoryName || "Receita"} {!isVirtual && `· Vence: ${item.dueDate}`}</p>
                       </div>
-
-                      <span style={{
-                        fontSize: 12, fontWeight: 700, flexShrink: 0,
-                        color: isPaid ? "var(--gray)" : isIncome ? "var(--teal)" : "var(--danger)"
-                      }}>
-                        {isIncome ? "+" : "-"}{fmt(item.amount)}
-                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 700, flexShrink: 0, color: isPaid ? "var(--gray)" : "var(--teal)" }}>+{fmt(item.amount)}</span>
                     </div>
                   );
                 })
             }
           </ListCard>
 
-          {/* Faturas do Cartão */}
-          <ListCard title="Faturas do Cartão">
-            {(!loading && !data?.pendingInvoices?.length)
-              ? <EmptyState>Nenhuma fatura em aberto.</EmptyState>
-              : data?.pendingInvoices?.map((fatura) => (
-                <div key={fatura.invoiceId} style={{
-                  display: "flex", flexDirection: "column", gap: 6, padding: "10px",
-                  background: "#fcfbfc", borderRadius: 10, marginBottom: 10,
-                  border: "1px solid #f0edf0"
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--deep)" }}>{fatura.accountName}</span>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: "var(--danger)" }}>{fmt(fatura.remaining)}</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 11, color: "var(--gray)", display: "flex", alignItems: "center", gap: 4 }}>
-                      <Circle size={7} fill={fatura.status === "CLOSED" ? "var(--danger)" : "var(--sage)"} stroke="none" />
-                      {fatura.status === "CLOSED" ? "Fechada" : "Aberta"} — {MONTHS[fatura.referenceMonth - 1]}/{fatura.referenceYear}
-                    </span>
-                    <span style={{ fontSize: 11, color: "var(--gray)" }}>Total: {fmt(fatura.totalAmount)}</span>
-                  </div>
-                </div>
-              ))
+          {/* COLUNA 2: Checklist (Apenas Despesas Reais ou Fixas) */}
+          <ListCard title="Contas a Pagar">
+            {(!loading && !data?.installmentItems?.filter(i => i.transactionType === "EXPENSE").length)
+              ? <EmptyState>Tudo em dia! 🎉</EmptyState>
+              : data?.installmentItems?.filter(i => i.transactionType === "EXPENSE").map((item, idx) => {
+                  const isVirtual = !!item.recurringTransactionId;
+                  const isPaid = item.status === "PAID";
+                  return (
+                    <div key={item.installmentId || `v-${idx}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #faf9fa" }}>
+                      <button onClick={() => { if (!isPaid) isVirtual ? handleMaterializeRecurring(item.recurringTransactionId, "EXPENSE") : handlePayInstallment(item.installmentId); }} style={checkBtnStyle(isPaid, "var(--teal)")}>
+                        {isPaid && <Check size={12} color="white" strokeWidth={3} />}
+                      </button>
+                      <div style={iconBoxStyle("#fdf3f3")}><ArrowDownRight size={12} color="var(--danger)" /></div>
+                      <div style={{ flex: 1, overflow: "hidden" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <p style={itemTitleStyle(isPaid)}>{item.transactionDescription}</p>
+                          {isVirtual && <span style={virtualTagStyle("var(--danger)")}>FIXO</span>}
+                        </div>
+                        <p style={{ fontSize: 10, color: "var(--gray)" }}>{item.categoryName || "Geral"} {isVirtual && item.dueDate ? `· Lança em: ${item.dueDate}` : `· Vence: ${item.dueDate}`}</p>
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 700, flexShrink: 0, color: isPaid ? "var(--gray)" : "var(--danger)" }}>-{fmt(item.amount)}</span>
+                    </div>
+                  );
+                })
             }
           </ListCard>
 
-          {/* Últimos Lançamentos */}
-          <ListCard title="Últimos Lançamentos">
-            {(!loading && !data?.recentTransactions?.length)
-              ? <EmptyState>Nenhum lançamento recente.</EmptyState>
-              : data?.recentTransactions?.map((t) => (
-                <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #faf9fa" }}>
-                  <div style={{
-                    width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                    background: t.type === "EXPENSE" ? "#fdf3f3" : t.type === "INCOME" ? "#f0f8f7" : "#f0f4ff",
-                    display: "flex", alignItems: "center", justifyContent: "center"
-                  }}>
-                    {t.type === "EXPENSE"
-                      ? <ArrowDownRight size={15} color="var(--danger)" />
-                      : t.type === "INCOME"
-                        ? <ArrowUpRight size={15} color="var(--teal)" />
-                        : <ArrowRightLeft size={15} color="#0055ff" />}
+          {/* COLUNA 3: Faturas e Últimos Lançamentos Misto */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, overflow: "hidden" }}>
+            
+            {/* Faturas do Mês Selecionado */}
+            <ListCard title="Faturas do Cartão" height="40%">
+              {(!loading && !data?.pendingInvoices?.length)
+                ? <EmptyState>Nenhuma fatura fechada para este mês.</EmptyState>
+                : data?.pendingInvoices?.map((fatura) => (
+                  <div key={fatura.invoiceId} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px", background: "#fcfbfc", borderRadius: 10, marginBottom: 10, border: "1px solid #f0edf0" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--deep)" }}>{fatura.accountName}</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "var(--danger)" }}>{fmt(fatura.remaining)}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 11, color: "var(--gray)", display: "flex", alignItems: "center", gap: 4 }}>
+                        <Circle size={7} fill={fatura.status === "CLOSED" ? "var(--danger)" : "var(--sage)"} stroke="none" />
+                        {fatura.status === "CLOSED" ? "Fechada" : "Aberta"}
+                      </span>
+                      <span style={{ fontSize: 11, color: "var(--gray)" }}>Vence em {MONTHS[month - 1]}</span>
+                    </div>
                   </div>
-                  <div style={{ flex: 1, overflow: "hidden" }}>
-                    <p style={{ fontSize: 12, fontWeight: 600, color: "var(--dark)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{t.description}</p>
-                    <p style={{ fontSize: 10, color: "var(--gray)" }}>{t.categoryName}</p>
+                ))
+              }
+            </ListCard>
+
+            {/* Últimos Lançamentos Reais */}
+            <ListCard title="Últimos Lançamentos" height="60%">
+              {(!loading && !data?.recentTransactions?.length)
+                ? <EmptyState>Nenhum lançamento recente.</EmptyState>
+                : data?.recentTransactions?.map((t) => (
+                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #faf9fa" }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: t.type === "EXPENSE" ? "#fdf3f3" : t.type === "INCOME" ? "#f0f8f7" : "#f0f4ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {t.type === "EXPENSE" ? <ArrowDownRight size={15} color="var(--danger)" /> : t.type === "INCOME" ? <ArrowUpRight size={15} color="var(--teal)" /> : <ArrowRightLeft size={15} color="#0055ff" />}
+                    </div>
+                    <div style={{ flex: 1, overflow: "hidden" }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: "var(--dark)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{t.description}</p>
+                      <p style={{ fontSize: 10, color: "var(--gray)" }}>{t.categoryName}</p>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, flexShrink: 0, color: t.type === "EXPENSE" ? "var(--danger)" : t.type === "INCOME" ? "var(--teal)" : "var(--deep)" }}>
+                      {t.type === "EXPENSE" ? "-" : t.type === "INCOME" ? "+" : ""}{fmt(t.amount)}
+                    </span>
                   </div>
-                  <span style={{
-                    fontSize: 12, fontWeight: 700, flexShrink: 0,
-                    color: t.type === "EXPENSE" ? "var(--danger)" : t.type === "INCOME" ? "var(--teal)" : "var(--deep)"
-                  }}>
-                    {t.type === "EXPENSE" ? "-" : t.type === "INCOME" ? "+" : ""}{fmt(t.amount)}
-                  </span>
-                </div>
-              ))
-            }
-          </ListCard>
+                ))
+              }
+            </ListCard>
+          </div>
+
         </div>
       </div>
 
-      {/* MODAIS */}
+      {/* MODAL PRESERVADO */}
       <TransactionModal
         isOpen={isTransModalOpen}
         onClose={() => setIsTransModalOpen(false)}
         onSuccess={fetchDashboard}
       />
-      <SimulatorModal isOpen={isSimModalOpen} onClose={() => setIsSimModalOpen(false)} />
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// Auxiliares de UI
+// Auxiliares de UI (Inalterados e Ajustados)
 // ─────────────────────────────────────────────────────────────
 const navBtnStyle = {
   background: "transparent", border: "none", cursor: "pointer",
@@ -468,11 +432,11 @@ function NavBtn({ icon, label, onClick, active }) {
   );
 }
 
-function ListCard({ title, children }) {
+function ListCard({ title, children, height = "auto" }) {
   return (
     <div style={{
       background: "var(--white)", borderRadius: 16, display: "flex",
-      flexDirection: "column", overflow: "hidden",
+      flexDirection: "column", overflow: "hidden", height: height, flex: height === "auto" ? 1 : "none",
       boxShadow: "0 2px 12px rgba(96,80,99,.05)", border: "1px solid #f0edf0"
     }}>
       <div style={{ padding: "14px 18px", borderBottom: "1px solid #f0edf0", background: "#faf9fa" }}>
@@ -492,3 +456,27 @@ function EmptyState({ children }) {
     </p>
   );
 }
+
+const checkBtnStyle = (isPaid, activeColor) => ({
+  minWidth: 20, height: 20, borderRadius: 6,
+  background: isPaid ? activeColor : "transparent",
+  border: isPaid ? "none" : "2px solid #e4e0e4",
+  display: "flex", alignItems: "center", justifyContent: "center",
+  cursor: isPaid ? "default" : "pointer"
+});
+
+const iconBoxStyle = (bg) => ({
+  width: 20, height: 20, borderRadius: 4, flexShrink: 0, background: bg,
+  display: "flex", alignItems: "center", justifyContent: "center"
+});
+
+const itemTitleStyle = (isPaid) => ({
+  fontSize: 12, fontWeight: 600, color: isPaid ? "var(--gray)" : "var(--dark)",
+  textDecoration: isPaid ? "line-through" : "none",
+  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+});
+
+const virtualTagStyle = (color) => ({
+  fontSize: 9, fontWeight: 700, color: color, background: "var(--cream)", 
+  borderRadius: 3, padding: "1px 4px", whiteSpace: "nowrap"
+});

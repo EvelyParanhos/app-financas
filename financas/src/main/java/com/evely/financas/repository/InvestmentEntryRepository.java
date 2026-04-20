@@ -49,7 +49,19 @@ public interface InvestmentEntryRepository extends JpaRepository<InvestmentEntry
     """)
     List<Object[]> monthlyHistoryByAccount(@Param("accountId") UUID accountId);
 
-    @Query("SELECT SUM(e.depositAmount) FROM InvestmentEntry e WHERE e.userId = :userId AND e.month = :month AND e.year = :year")
-    BigDecimal somarAportesMensais(UUID userId, int month, int year);
+    // Substitua o método somarAportesMensais atual por este:
+    @Query("""
+        SELECT COALESCE(SUM(e.amount), 0)
+        FROM InvestmentEntry e
+        WHERE e.account.owner.id = :userId
+        AND e.type = 'DEPOSIT'
+        AND MONTH(e.entryDate) = :month
+        AND YEAR(e.entryDate) = :year
+    """)
+    BigDecimal somarAportesMensais(
+        @Param("userId") UUID userId, 
+        @Param("month") int month, 
+        @Param("year") int year
+    );
 
 }

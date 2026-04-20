@@ -70,10 +70,12 @@ public class DashboardService {
         BigDecimal leftover = projectedIncome.subtract(committed);
 
         // ── Breakdown do comprometido ────────────────────────────────
-        // Gastos fixos recorrentes (estimativa mensal)
         BigDecimal fixedExpenses = estimarGastosFixos(userId);
-        // Faturas de cartão pendentes
-        List<InvoiceSummaryDTO> invoices = buildInvoiceSummaries(userId);
+        
+        // CORREÇÃO 1: Faturas puxam apenas do mês atual, não de todos os pendentes
+        List<InvoiceSummaryDTO> invoices = buildInvoiceSummaries(userId, month, year);
+        
+        // O valor do CC Committed puxa apenas do mês atual
         BigDecimal ccCommitted = invoices.stream()
             .map(InvoiceSummaryDTO::getRemaining)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -86,13 +88,18 @@ public class DashboardService {
         BigDecimal monthlyDeposits = investmentEntryRepository.somarAportesMensais(userId, month, year);
         if (monthlyDeposits == null) monthlyDeposits = BigDecimal.ZERO;
 
-        // ── Checklist: parcelas PENDING (EXPENSE + INCOME) ──────────
+        // ── Checklist: parcelas PENDING ──────────
         List<InstallmentItemDTO> installmentItems = installmentRepository
             .findPendingWithDetailsByUserAndPeriod(userId, inicio, fim)
             .stream().map(this::toInstallmentItem).collect(Collectors.toList());
 
-        // Adiciona recorrentes virtuais (não materializados ainda)
         installmentItems.addAll(buildRecurrentesVirtuais(userId, inicio, fim));
+
+        // CORREÇÃO 2: Tira as receitas (salário) da lista de "Contas a Pagar"
+        installmentItems = installmentItems.stream()
+            .filter(item -> "EXPENSE".equals(item.getTransactionType()))
+            .collect(Collectors.toList());
+
         installmentItems.sort(Comparator.comparing(
             InstallmentItemDTO::getDueDate,
             Comparator.nullsLast(Comparator.naturalOrder())
@@ -140,9 +147,8 @@ public class DashboardService {
         LocalDate inicio = LocalDate.of(year, month, 1);
         LocalDate fim = inicio.with(TemporalAdjusters.lastDayOfMonth());
 
-        // Saldo compartilhado (contas com shared=true de ambos)
         BigDecimal saldoCompartilhado = calcularSaldoCompartilhado(userId, partnerId);
-        List<AccountBalanceDTO> breakdown = buildAccountBreakdown(userId); // simplificado para o próprio
+        List<AccountBalanceDTO> breakdown = buildAccountBreakdown(userId); 
 
         BigDecimal committedUsuario = installmentRepository.somarDividasComFiltro(userId, inicio, fim, false);
         if (committedUsuario == null) committedUsuario = BigDecimal.ZERO;
@@ -158,7 +164,9 @@ public class DashboardService {
         BigDecimal leftover = projectedIncome.subtract(totalCommitted);
 
         BigDecimal fixedExpenses = estimarGastosFixos(userId);
-        List<InvoiceSummaryDTO> invoices = buildInvoiceSummaries(userId);
+        
+        // CORREÇÃO 1 NO CASAL: Usa o novo método com mês e ano
+        List<InvoiceSummaryDTO> invoices = buildInvoiceSummaries(userId, month, year);
         BigDecimal ccCommitted = invoices.stream()
             .map(InvoiceSummaryDTO::getRemaining)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -181,6 +189,8 @@ public class DashboardService {
         List<InstallmentItemDTO> installmentItems = Stream
             .concat(parcelasUsuario.stream(), parcelasParceiro.stream())
             .map(this::toInstallmentItem)
+            // CORREÇÃO 2 NO CASAL: Tira as receitas do checklist
+            .filter(item -> "EXPENSE".equals(item.getTransactionType()))
             .sorted(Comparator.comparing(InstallmentItemDTO::getDueDate,
                 Comparator.nullsLast(Comparator.naturalOrder())))
             .collect(Collectors.toList());
@@ -289,8 +299,10 @@ public class DashboardService {
         return total;
     }
 
-    private List<InvoiceSummaryDTO> buildInvoiceSummaries(UUID userId) {
+    // CORREÇÃO 1: Adicionado month e year para filtrar apenas a fatura do mês atual na tela
+    private List<InvoiceSummaryDTO> buildInvoiceSummaries(UUID userId, int month, int year) {
         return invoiceRepository.findPendingInvoicesByUserId(userId).stream()
+            .filter(inv -> inv.getReferenceMonth() == month && inv.getReferenceYear() == year)
             .map(inv -> new InvoiceSummaryDTO(
                 inv.getId(),
                 inv.getAccount().getName(),
@@ -320,10 +332,6 @@ public class DashboardService {
         );
     }
 
-    /**
-     * Soma os valores estimados de transações recorrentes do tipo especificado
-     * que ainda NÃO foram materializadas pelo scheduler no período informado.
-     */
     private BigDecimal calcularVirtualRecurrentes(
             UUID userId, LocalDate inicio, LocalDate fim, TransactionType tipo) {
         return recurringRepository.findByAccountOwnerId(userId).stream()
@@ -337,9 +345,6 @@ public class DashboardService {
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    /**
-     * Estimativa mensal dos gastos fixos recorrentes (para o breakdown do card).
-     */
     private BigDecimal estimarGastosFixos(UUID userId) {
         return recurringRepository.findByAccountOwnerId(userId).stream()
             .filter(r -> r.getType() == TransactionType.EXPENSE)
@@ -347,10 +352,6 @@ public class DashboardService {
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    /**
-     * Constrói a lista de itens virtuais do checklist para transações recorrentes
-     * que ainda não foram materializadas no mês selecionado.
-     */
     private List<InstallmentItemDTO> buildRecurrentesVirtuais(
             UUID userId, LocalDate inicio, LocalDate fim) {
 
