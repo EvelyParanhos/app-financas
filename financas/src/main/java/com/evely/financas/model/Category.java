@@ -17,25 +17,40 @@ import jakarta.persistence.Table;
 import lombok.*;
 
 @Entity
-@Table (name = "categories")
+@Table(name = "categories")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 public class Category {
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column (name = "id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     private UUID id;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
-    private User owner; 
+    private User owner;
 
-    private boolean active = true; 
+    private boolean active = true;
+
     private String name;
 
     @Enumerated(EnumType.STRING)
     private CategoryType type;
-    
+
+    /**
+     * Nome do ícone Lucide (ex: "house", "utensils", "car").
+     * ddl-auto=update adiciona a coluna automaticamente.
+     */
+    @Column(name = "icon")
+    private String icon;
+
+    /**
+     * Cor hex da categoria (ex: "#6366F1").
+     * ddl-auto=update adiciona a coluna automaticamente.
+     */
+    @Column(name = "color")
+    private String color;
 }

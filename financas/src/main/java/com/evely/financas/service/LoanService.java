@@ -28,6 +28,7 @@ public class LoanService {
     private final TransactionRepository transactionRepository;
     private final BalanceService balanceService;
     private final InvestmentEntryRepository investmentEntryRepository;
+    private final AuditService auditService;
 
     // =========================================================
     // EMPRÉSTIMO A TERCEIRO (RN12)
@@ -43,7 +44,6 @@ public class LoanService {
 
         balanceService.validarSaldo(sourceAccount, dto.totalAmount());
 
-        // Transação de saída (LOAN_OUT)
         Transaction saida = new Transaction();
         saida.setDescription("Empréstimo para: " + dto.borrowerName());
         saida.setTotalAmount(dto.totalAmount());
@@ -53,7 +53,6 @@ public class LoanService {
         saida.setSimulation(false);
         Transaction transacaoSalva = transactionRepository.save(saida);
 
-        // Débito imediato (RN01 — LOAN_OUT liquida na hora)
         balanceService.baixarSaldo(sourceAccount, dto.totalAmount());
 
         Loan loan = new Loan();
@@ -74,7 +73,15 @@ public class LoanService {
             loan.setBorrowerUser(borrower);
         }
 
-        return loanRepository.save(loan);
+        Loan salvo = loanRepository.save(loan);
+
+        auditService.log(
+            lenderId, "LOAN_CREATED", "Loan", salvo.getId(),
+            "Empréstimo de R$" + dto.totalAmount() + " para '" + dto.borrowerName() + "'",
+            dto.totalAmount()
+        );
+
+        return salvo;
     }
 
     // =========================================================

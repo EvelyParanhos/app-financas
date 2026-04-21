@@ -9,7 +9,6 @@ import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Category;
 import com.evely.financas.model.User;
 import com.evely.financas.repository.CategoryRepository;
-import com.evely.financas.repository.PartnershipRepository;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -17,12 +16,13 @@ import lombok.RequiredArgsConstructor;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
-    private final PartnershipRepository partnershipRepository;
 
     public Category create(CategoryDTO dto, User owner) {
         Category category = new Category();
         category.setName(dto.name());
         category.setType(dto.type());
+        category.setIcon(dto.icon());
+        category.setColor(dto.color());
         category.setOwner(owner);
         category.setActive(true);
         return categoryRepository.save(category);
@@ -30,30 +30,6 @@ public class CategoryService {
 
     public List<Category> listarMinhas(User owner) {
         return categoryRepository.findByOwnerAndActiveTrue(owner);
-    }
-
-    /**
-     * Retorna as categorias do usuário + as do parceiro.
-     *
-     * Cenário: ao registrar uma transação em uma conta compartilhada,
-     * o usuário pode usar tanto suas próprias categorias quanto as do parceiro.
-     * Isso evita a necessidade de categorias duplicadas no casal.
-     *
-     * Se o usuário não tiver parceiro, retorna apenas as suas próprias.
-     */
-    public List<Category> listarCasal(UUID userId) {
-        return partnershipRepository.findByUserId(userId)
-            .map(p -> {
-                UUID partnerId = p.getUserA().getId().equals(userId)
-                    ? p.getUserB().getId()
-                    : p.getUserA().getId();
-                return categoryRepository.findActivasByOwnerIds(userId, partnerId);
-            })
-            .orElseGet(() -> {
-                User user = new User();
-                user.setId(userId);
-                return categoryRepository.findByOwnerAndActiveTrue(user);
-            });
     }
 
     public void softDelete(UUID categoryId, User currentUser) {
@@ -65,17 +41,20 @@ public class CategoryService {
     }
 
     public Category atualizar(UUID id, CategoryDTO dto, User currentUser) {
-        Category categoriaExistente = categoryRepository.findById(id)
+        Category categoria = categoryRepository.findById(id)
             .orElseThrow(() -> new ObjectNotFoundException("Categoria não encontrada"));
-        validarDono(categoriaExistente, currentUser);
-        categoriaExistente.setName(dto.name());
-        categoriaExistente.setType(dto.type());
-        return categoryRepository.save(categoriaExistente);
+        validarDono(categoria, currentUser);
+        categoria.setName(dto.name());
+        categoria.setType(dto.type());
+        // Atualiza ícone e cor apenas se fornecidos
+        if (dto.icon() != null) categoria.setIcon(dto.icon());
+        if (dto.color() != null) categoria.setColor(dto.color());
+        return categoryRepository.save(categoria);
     }
 
     private void validarDono(Category category, User user) {
         if (!category.getOwner().getId().equals(user.getId())) {
-            throw new AccessDeniedException("Você não tem permissão para mexer nesta categoria");
+            throw new AccessDeniedException("Você não tem permissão para mexer nesta categoria.");
         }
     }
 }

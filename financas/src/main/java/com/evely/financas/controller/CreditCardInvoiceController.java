@@ -24,14 +24,23 @@ public class CreditCardInvoiceController {
     }
 
     @GetMapping("/pending")
-    public ResponseEntity<List<CreditCardInvoice>> faturasPendentes(@AuthenticationPrincipal User user) {
+    public ResponseEntity<List<CreditCardInvoice>> faturasPendentes(
+            @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(invoiceService.listarFaturasPendentesDoUsuario(user.getId()));
     }
 
+    /**
+     * ✅ ITEM 6: sourceAccountId agora é obrigatório.
+     * Indica de qual conta corrente/carteira sai o dinheiro para pagar a fatura.
+     */
     @PostMapping("/{invoiceId}/pay")
     public ResponseEntity<CreditCardInvoice> pagar(
             @PathVariable UUID invoiceId,
-            @RequestParam BigDecimal valor) {
-        return ResponseEntity.ok(invoiceService.pagarFatura(invoiceId, valor));
+            @RequestParam BigDecimal valor,
+            @RequestParam UUID sourceAccountId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(
+            invoiceService.pagarFatura(invoiceId, valor, sourceAccountId, user.getId())
+        );
     }
 }

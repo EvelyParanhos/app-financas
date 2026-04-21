@@ -18,16 +18,6 @@ import com.evely.financas.repository.InstallmentRepository;
 import com.evely.financas.repository.InvestmentEntryRepository;
 import lombok.RequiredArgsConstructor;
 
-/**
- * Serviço de Estorno (RN13)
- *
- * RN13 diz: É proibido DELETAR uma transação com parcelas PAID.
- * O estorno é a operação inversa — desfaz o efeito financeiro
- * de uma parcela paga sem apagar o histórico.
- *
- * Após o estorno, a parcela volta para PENDING e pode ser
- * paga novamente pelo valor correto.
- */
 @Service
 @RequiredArgsConstructor
 public class EstornoService {
@@ -36,13 +26,13 @@ public class EstornoService {
     private final BalanceService balanceService;
     private final CreditCardInvoiceRepository invoiceRepository;
     private final InvestmentEntryRepository investmentEntryRepository;
+    private final AuditService auditService;
 
     @Transactional
     public Installment estornarParcela(UUID installmentId, UUID userId) {
         Installment parcela = installmentRepository.findById(installmentId)
             .orElseThrow(() -> new ObjectNotFoundException("Parcela não encontrada."));
 
-        // Somente o pagador pode estornar sua parcela
         if (parcela.getPayer() == null || !parcela.getPayer().getId().equals(userId)) {
             throw new RuntimeException("Você não tem permissão para estornar esta parcela.");
         }
@@ -54,17 +44,11 @@ public class EstornoService {
         TransactionType tipo = parcela.getTransaction().getType();
         Account conta = parcela.getTransaction().getAccount();
 
-        // ----------------------------------------------------------------
-        // INTERNAL_REPAYMENT — estorna a reposição do auto-empréstimo
-        // Dinheiro volta para a corrente e sai do investimento
-        // ----------------------------------------------------------------
         if (tipo == TransactionType.INTERNAL_REPAYMENT) {
             Account investimento = parcela.getTransaction().getDestinationAccount();
 
-            // Reverte o lançamento: volta para a corrente
             balanceService.subirSaldo(conta, parcela.getAmount());
 
-            // Retira do investimento (cria WITHDRAWAL no histórico)
             InvestmentEntry estorno = new InvestmentEntry();
             estorno.setAccount(investimento);
             estorno.setType(InvestmentEntryType.WITHDRAWAL);
@@ -74,12 +58,19 @@ public class EstornoService {
             investmentEntryRepository.save(estorno);
 
             parcela.setStatus(InstallmentStatus.PENDING);
-            return installmentRepository.save(parcela);
+            Installment salva = installmentRepository.save(parcela);
+
+            auditService.log(
+                userId, "INSTALLMENT_REVERSED", "Installment", parcela.getId(),
+                "Estorno de reposição auto-empréstimo — parcela #" + parcela.getInstallmentNumber()
+                    + " de '" + parcela.getTransaction().getDescription() + "'"
+                    + " — R$" + parcela.getAmount(),
+                parcela.getAmount()
+            );
+
+            return salva;
         }
 
-        // ----------------------------------------------------------------
-        // Cartão de crédito — estorno afeta a fatura
-        // ----------------------------------------------------------------
         if (parcela.getInvoice() != null) {
             CreditCardInvoice invoice = parcela.getInvoice();
 
@@ -89,33 +80,46 @@ public class EstornoService {
                     "Para estornar, entre em contato com o suporte.");
             }
 
-            // Reduz o valor pago na fatura e reabre se necessário
             if (invoice.getPaidAmount().compareTo(parcela.getAmount()) >= 0) {
                 invoice.setPaidAmount(invoice.getPaidAmount().subtract(parcela.getAmount()));
                 invoice.setStatus(InvoiceStatus.PARTIALLY_PAID);
                 invoiceRepository.save(invoice);
             }
 
-            // Remove o limite do cartão que havia sido devolvido ao pagar
-            // (o pagamento da fatura devolve limite — estornar retira de volta)
             balanceService.baixarSaldo(conta, parcela.getAmount());
-
             parcela.setStatus(InstallmentStatus.PENDING);
-            return installmentRepository.save(parcela);
+            Installment salva = installmentRepository.save(parcela);
+
+            auditService.log(
+                userId, "INSTALLMENT_REVERSED", "Installment", parcela.getId(),
+                "Estorno de parcela de cartão — '"
+                    + parcela.getTransaction().getDescription() + "'"
+                    + " — R$" + parcela.getAmount(),
+                parcela.getAmount()
+            );
+
+            return salva;
         }
 
-        // ----------------------------------------------------------------
-        // Conta corrente / carteira — reverte o efeito de caixa
-        // ----------------------------------------------------------------
         switch (tipo) {
-            case EXPENSE  -> balanceService.subirSaldo(conta, parcela.getAmount()); // devolveu
-            case INCOME   -> balanceService.baixarSaldo(conta, parcela.getAmount()); // desfaz entrada
-            case LOAN_OUT -> balanceService.subirSaldo(conta, parcela.getAmount()); // dinheiro "voltou"
+            case EXPENSE  -> balanceService.subirSaldo(conta, parcela.getAmount());
+            case INCOME   -> balanceService.baixarSaldo(conta, parcela.getAmount());
+            case LOAN_OUT -> balanceService.subirSaldo(conta, parcela.getAmount());
             default -> throw new RuntimeException(
                 "Tipo de transação '" + tipo + "' não suporta estorno direto.");
         }
 
         parcela.setStatus(InstallmentStatus.PENDING);
-        return installmentRepository.save(parcela);
+        Installment salva = installmentRepository.save(parcela);
+
+        auditService.log(
+            userId, "INSTALLMENT_REVERSED", "Installment", parcela.getId(),
+            "Estorno de parcela #" + parcela.getInstallmentNumber()
+                + " de '" + parcela.getTransaction().getDescription() + "'"
+                + " — R$" + parcela.getAmount(),
+            parcela.getAmount()
+        );
+
+        return salva;
     }
 }

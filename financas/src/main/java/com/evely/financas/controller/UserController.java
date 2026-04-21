@@ -1,23 +1,17 @@
 package com.evely.financas.controller;
 
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+import com.evely.financas.dto.CadastroDTO;
+import com.evely.financas.dto.UserResponseDTO;
 import com.evely.financas.model.User;
+import com.evely.financas.repository.PartnershipRepository;
 import com.evely.financas.service.EmailService;
 import com.evely.financas.service.UserService;
 import com.evely.financas.service.VerificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users")
@@ -27,17 +21,18 @@ public class UserController {
     private final UserService userService;
     private final VerificationService verificationService;
     private final EmailService emailService;
+    private final PartnershipRepository partnershipRepository;
 
     public record VerificationDTO(String email, String code) {}
     public record EditUserDTO(String name, String telegramId) {}
 
-    // ✅ Público — cadastro de novo usuário
+    // ✅ Público — cadastro recebe CadastroDTO, nunca a entidade User
     @PostMapping
-    public ResponseEntity<User> salvar(@Valid @RequestBody User user) {
-        User novoUser = userService.salvar(user);
+    public ResponseEntity<UserResponseDTO> salvar(@Valid @RequestBody CadastroDTO dto) {
+        User novoUser = userService.salvar(dto);
         String codigo = verificationService.solicitarNovoCodigo(novoUser.getId());
         emailService.enviarEmailVerificacao(novoUser.getEmail(), codigo);
-        return ResponseEntity.status(201).body(novoUser);
+        return ResponseEntity.status(201).body(toResponseDTO(novoUser, false));
     }
 
     // ✅ Público — verificação de conta
@@ -56,28 +51,42 @@ public class UserController {
         return ResponseEntity.ok("Novo código enviado! Verifique seu e-mail.");
     }
 
-    // ✅ Autenticado — dados do próprio usuário
+    // ✅ Autenticado — retorna UserResponseDTO (sem campos sensíveis)
     @GetMapping("/me")
-    public ResponseEntity<User> me(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(user);
+    public ResponseEntity<UserResponseDTO> me(@AuthenticationPrincipal User user) {
+        boolean hasPartner = partnershipRepository.findByUserId(user.getId()).isPresent();
+        return ResponseEntity.ok(toResponseDTO(user, hasPartner));
     }
 
-    // ✅ Autenticado — editar APENAS os próprios dados
+    // ✅ Autenticado — editar apenas os próprios dados
     @PutMapping("/me")
-    public ResponseEntity<User> editarProprioPerfil(
+    public ResponseEntity<UserResponseDTO> editarProprioPerfil(
             @RequestBody EditUserDTO dto,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(userService.editarPerfil(user.getId(), dto.name(), dto.telegramId()));
+        User atualizado = userService.editarPerfil(user.getId(), dto.name(), dto.telegramId());
+        boolean hasPartner = partnershipRepository.findByUserId(atualizado.getId()).isPresent();
+        return ResponseEntity.ok(toResponseDTO(atualizado, hasPartner));
     }
 
-    // ✅ Autenticado — excluir APENAS a própria conta
+    // ✅ Autenticado — excluir apenas a própria conta
     @DeleteMapping("/me")
     public ResponseEntity<Void> excluirPropriaConta(@AuthenticationPrincipal User user) {
         userService.excluir(user.getId());
         return ResponseEntity.noContent().build();
     }
 
-    // ❌ REMOVIDOS os endpoints GET /users (lista todos) e DELETE /{id} (qualquer id)
-    // Esses endpoints expunham dados de todos os usuários sem nenhuma autorização.
-    // Se precisar de acesso admin no futuro, implemente com role ADMIN + filtro de segurança.
+    // -------------------------------------------------------------------------
+    // HELPER PRIVADO
+    // -------------------------------------------------------------------------
+
+    private UserResponseDTO toResponseDTO(User user, boolean hasPartner) {
+        return new UserResponseDTO(
+            user.getId(),
+            user.getName(),
+            user.getEmail(),
+            user.getTelegramId(),
+            user.getStatus(),
+            hasPartner
+        );
+    }
 }

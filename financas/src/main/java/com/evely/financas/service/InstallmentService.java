@@ -28,10 +28,8 @@ public class InstallmentService {
     private final BalanceService balanceService;
     private final PartnershipRepository partnershipRepository;
     private final InvestmentEntryRepository investmentEntryRepository;
+    private final AuditService auditService;
 
-    // ----------------------------------------------------------------
-    // RN01 — Efeito de Liquidação
-    // ----------------------------------------------------------------
     @Transactional
     public Installment pagarParcela(UUID id) {
         Installment parcela = installmentRepository.findById(id)
@@ -47,22 +45,11 @@ public class InstallmentService {
         TransactionType tipo = parcela.getTransaction().getType();
         Account conta = parcela.getTransaction().getAccount();
 
-        // ----------------------------------------------------------------
-        // INTERNAL_REPAYMENT — Reposição do auto-empréstimo (RN11)
-        //
-        // O dinheiro sai da conta corrente (onde foi "gasto" o empréstimo)
-        // e volta para o investimento que foi "emprestado".
-        //
-        // ✅ FIX: Além de transferir, cria InvestmentEntry DEPOSIT para
-        //    manter o histórico correto do investimento.
-        // ----------------------------------------------------------------
         if (tipo == TransactionType.INTERNAL_REPAYMENT) {
             Account destino = parcela.getTransaction().getDestinationAccount();
 
-            // Debita da conta corrente
             balanceService.baixarSaldo(conta, parcela.getAmount());
 
-            // Cria o lançamento de retorno no investimento
             InvestmentEntry deposito = new InvestmentEntry();
             deposito.setAccount(destino);
             deposito.setType(InvestmentEntryType.DEPOSIT);
@@ -71,42 +58,59 @@ public class InstallmentService {
             deposito.setNotes("Reposição auto-empréstimo — parcela " + parcela.getInstallmentNumber());
             investmentEntryRepository.save(deposito);
 
+            auditService.log(
+                parcela.getPayer().getId(),
+                "INSTALLMENT_PAID",
+                "Installment",
+                parcela.getId(),
+                "Reposição auto-empréstimo — parcela #" + parcela.getInstallmentNumber()
+                    + " de '" + parcela.getTransaction().getDescription() + "'"
+                    + " — R$" + parcela.getAmount(),
+                parcela.getAmount()
+            );
+
             return parcela;
         }
 
-        // ----------------------------------------------------------------
-        // Parcela de cartão de crédito (RN02)
-        // O débito no saldo bancário acontece quando a FATURA é paga,
-        // não quando a parcela é marcada como PAGA. Aqui só rastreamos.
-        // ----------------------------------------------------------------
         if (parcela.getInvoice() != null) {
+            // Cartão: só registra o log — débito acontece ao pagar a fatura
+            auditService.log(
+                parcela.getPayer().getId(),
+                "INSTALLMENT_PAID",
+                "Installment",
+                parcela.getId(),
+                "Parcela #" + parcela.getInstallmentNumber()
+                    + " de '" + parcela.getTransaction().getDescription() + "'"
+                    + " marcada como paga (fatura cartão) — R$" + parcela.getAmount(),
+                parcela.getAmount()
+            );
             return parcela;
         }
 
-        // ----------------------------------------------------------------
-        // RN01 — Conta corrente / carteira
-        // EXPENSE: debita
-        // INCOME:  credita
-        // LOAN_OUT: debita (o dinheiro saiu para o terceiro)
-        // ----------------------------------------------------------------
         switch (tipo) {
             case EXPENSE  -> balanceService.baixarSaldo(conta, parcela.getAmount());
             case INCOME   -> balanceService.subirSaldo(conta, parcela.getAmount());
             case LOAN_OUT -> balanceService.baixarSaldo(conta, parcela.getAmount());
-            default -> {
-                // TRANSFER: executado no momento do registro — não age aqui
-            }
+            default -> { /* TRANSFER: executado no registro */ }
         }
+
+        auditService.log(
+            parcela.getPayer().getId(),
+            "INSTALLMENT_PAID",
+            "Installment",
+            parcela.getId(),
+            "Parcela #" + parcela.getInstallmentNumber()
+                + " de '" + parcela.getTransaction().getDescription() + "' paga"
+                + " — R$" + parcela.getAmount(),
+            parcela.getAmount()
+        );
 
         return parcela;
     }
 
-    // ----------------------------------------------------------------
-    // RN06 — Divisão Híbrida
-    // ✅ RN07: Valida que ambos fazem parte da mesma partnership
-    // ----------------------------------------------------------------
     @Transactional
-    public void dividirParcela(UUID installmentId, BigDecimal valorPayer1, UUID idPayer2, UUID userId) {
+    public void dividirParcela(UUID installmentId, BigDecimal valorPayer1,
+                               UUID idPayer2, UUID userId) {
         Installment original = installmentRepository.findById(installmentId)
             .orElseThrow(() -> new ObjectNotFoundException("Parcela não encontrada!"));
 
@@ -114,7 +118,6 @@ public class InstallmentService {
             throw new RuntimeException("Não é possível dividir uma parcela já paga.");
         }
 
-        // ✅ RN07: Valida partnership
         validarPartnership(userId, idPayer2);
 
         BigDecimal valorTotalOriginal = original.getAmount();
@@ -137,16 +140,12 @@ public class InstallmentService {
         irma.setStatus(original.getStatus());
         irma.setAmount(valorPayer2);
         irma.setPayer(payer2);
-        irma.setInvoice(original.getInvoice()); // herda a fatura
+        irma.setInvoice(original.getInvoice());
 
         installmentRepository.save(original);
         installmentRepository.save(irma);
     }
 
-    // ----------------------------------------------------------------
-    // RN05 — Troca Dinâmica de Pagador
-    // ✅ RN07: Valida partnership
-    // ----------------------------------------------------------------
     @Transactional
     public void assumirParcelaTotal(UUID installmentId, UUID novoPayerId, UUID userId) {
         Installment parcela = installmentRepository.findById(installmentId)
@@ -156,7 +155,6 @@ public class InstallmentService {
             throw new RuntimeException("Não é possível alterar o pagador de uma parcela já paga.");
         }
 
-        // ✅ RN07: Valida partnership
         validarPartnership(userId, novoPayerId);
 
         User novoPagador = userRepository.findById(novoPayerId)
@@ -166,9 +164,6 @@ public class InstallmentService {
         installmentRepository.save(parcela);
     }
 
-    // ----------------------------------------------------------------
-    // Validação de partnership (RN07)
-    // ----------------------------------------------------------------
     private void validarPartnership(UUID userId, UUID outroUserId) {
         boolean saoParceiroS = partnershipRepository.findByUserId(userId)
             .map(p -> p.getUserA().getId().equals(outroUserId)

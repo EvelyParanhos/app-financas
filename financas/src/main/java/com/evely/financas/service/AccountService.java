@@ -11,6 +11,7 @@ import com.evely.financas.model.Account;
 import com.evely.financas.model.InvestmentEntry;
 import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.InvestmentEntryRepository;
+import com.evely.financas.repository.PartnershipRepository;
 import com.evely.financas.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ public class AccountService {
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;
     private final InvestmentEntryRepository investmentEntryRepository;
-    // ✅ SnapshotRepository REMOVIDO — não é mais usado para saldo atual
+    private final PartnershipRepository partnershipRepository;
 
     @Transactional
     public Account salvar(Account account) {
@@ -32,7 +33,6 @@ public class AccountService {
             .orElseThrow(() -> new ObjectNotFoundException(
                 "Não foi possível criar a conta: Usuário dono não encontrado!"));
 
-        // Validações por tipo
         if (account.getType() == AccountType.CREDIT_CARD) {
             if (account.getCardLimit() == null || account.getCardLimit().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new RuntimeException("Cartão de crédito exige um limite maior que zero.");
@@ -45,15 +45,12 @@ public class AccountService {
         Account salva = accountRepository.save(account);
 
         if (salva.getType() == AccountType.CREDIT_CARD) {
-            // Cartão nasce com saldo = limite disponível (ainda não usou nada)
             accountRepository.setBalance(salva.getId(), salva.getCardLimit());
-
         } else {
             BigDecimal saldoInicial = account.getInitialBalance() != null
                 ? account.getInitialBalance()
                 : BigDecimal.ZERO;
 
-            // Para INVESTMENT: cria InvestmentEntry de aporte inicial
             if (salva.getType() == AccountType.INVESTMENT && saldoInicial.compareTo(BigDecimal.ZERO) > 0) {
                 InvestmentEntry entryInicial = new InvestmentEntry();
                 entryInicial.setAccount(salva);
@@ -62,9 +59,7 @@ public class AccountService {
                 entryInicial.setEntryDate(LocalDate.now());
                 entryInicial.setNotes("Saldo inicial");
                 investmentEntryRepository.save(entryInicial);
-                // INVESTMENT não usa a coluna balance — não seta aqui
             } else if (salva.getType() != AccountType.INVESTMENT) {
-                // CHECKING / CASH: seta o saldo inicial direto na coluna
                 accountRepository.setBalance(salva.getId(), saldoInicial);
             }
         }
@@ -72,10 +67,6 @@ public class AccountService {
         return salva;
     }
 
-    /**
-     * Define (ou corrige) o saldo de uma conta existente.
-     * Útil para o onboarding da carteira CASH criada automaticamente.
-     */
     @Transactional
     public void definirSaldoInicial(UUID accountId, BigDecimal novoSaldo, UUID userId) {
         Account conta = accountRepository.findById(accountId)
@@ -97,6 +88,41 @@ public class AccountService {
         }
 
         accountRepository.setBalance(accountId, novoSaldo);
+    }
+
+    /**
+     * Busca uma conta validando que o usuário tem permissão de uso.
+     * Permite acesso se:
+     *   a) o usuário é o dono da conta, OU
+     *   b) a conta é compartilhada (is_shared = true) e o dono é parceiro do usuário.
+     *
+     * Usado pelo RecurringTransactionController para permitir que
+     * um parceiro crie recorrentes apontando para a conta de investimento
+     * compartilhada do outro (ex: "Reserva do Casal" de posse do marido).
+     */
+    public Account buscarContaComAcessoPermitido(UUID accountId, UUID userId) {
+        Account conta = accountRepository.findById(accountId)
+            .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
+
+        // Dono direto — acesso irrestrito
+        if (conta.getOwner().getId().equals(userId)) {
+            return conta;
+        }
+
+        // Conta compartilhada de um parceiro ativo
+        boolean parceiroDaConta = conta.isShared()
+            && partnershipRepository.findByUserId(userId)
+                .map(p -> p.getUserA().getId().equals(conta.getOwner().getId())
+                       || p.getUserB().getId().equals(conta.getOwner().getId()))
+                .orElse(false);
+
+        if (parceiroDaConta) {
+            return conta;
+        }
+
+        throw new RuntimeException(
+            "Você não tem permissão para usar esta conta. " +
+            "Contas de parceiros só são acessíveis se estiverem marcadas como compartilhadas.");
     }
 
     public void excluir(UUID id) {

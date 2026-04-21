@@ -12,6 +12,7 @@ import com.evely.financas.model.RecurringTransaction;
 import com.evely.financas.model.User;
 import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.RecurringTransactionRepository;
+import com.evely.financas.service.AccountService;
 import com.evely.financas.service.RecurringTransactionService;
 import lombok.RequiredArgsConstructor;
 
@@ -22,13 +23,16 @@ public class RecurringTransactionController {
 
     private final RecurringTransactionRepository recurringRepository;
     private final AccountRepository accountRepository;
+    private final AccountService accountService;
     private final RecurringTransactionService recurringTransactionService;
 
     @PostMapping
     public ResponseEntity<RecurringTransaction> criar(
             @RequestBody RecurringTransaction rt,
             @AuthenticationPrincipal User user) {
-        if (rt.getAccount() == null) {
+
+        if (rt.getAccount() == null || rt.getAccount().getId() == null) {
+            // Sem conta informada: usa a carteira CASH do próprio usuário
             Account carteira = accountRepository
                 .findByOwnerId(user.getId())
                 .stream()
@@ -36,7 +40,13 @@ public class RecurringTransactionController {
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Carteira não encontrada"));
             rt.setAccount(carteira);
+        } else {
+            // ✅ ITEM 5: valida acesso — aceita conta própria OU conta compartilhada do parceiro
+            Account conta = accountService
+                .buscarContaComAcessoPermitido(rt.getAccount().getId(), user.getId());
+            rt.setAccount(conta);
         }
+
         return ResponseEntity.status(201).body(recurringRepository.save(rt));
     }
 
@@ -45,34 +55,6 @@ public class RecurringTransactionController {
         return ResponseEntity.ok(recurringRepository.findByAccountOwnerId(user.getId()));
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> excluir(
-            @PathVariable UUID id,
-            @AuthenticationPrincipal User user) {
-        recurringTransactionService.excluir(id, user.getId());
-        return ResponseEntity.noContent().build();
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<RecurringTransaction> editar(
-            @PathVariable UUID id,
-            @RequestBody RecurringTransaction rt,
-            @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(recurringTransactionService.editar(id, rt, user.getId()));
-    }
-
-    /**
-     * Materializa um item recorrente virtual para o mês/ano indicado.
-     *
-     * POST /api/recurring/{id}/materialize?month=4&year=2026
-     * POST /api/recurring/{id}/materialize?month=4&year=2026&actualAmount=187.50
-     *
-     * O parâmetro actualAmount é OPCIONAL:
-     *  - Para transações FIXAS (isVariable=false): ignorado, usa estimatedAmount.
-     *  - Para transações VARIÁVEIS (isVariable=true): obrigatório para registrar
-     *    o valor real (ex: conta de luz que veio R$187,50 em vez de R$150 estimados).
-     *    Se omitido em transação variável, registra com o valor estimado como rascunho.
-     */
     @PostMapping("/{id}/materialize")
     public ResponseEntity<String> materializar(
             @PathVariable UUID id,
