@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.evely.financas.dto.LoanOutDTO;
 import com.evely.financas.dto.SelfLoanDTO;
 import com.evely.financas.enums.InstallmentStatus;
+import com.evely.financas.enums.InvestmentEntryType;
 import com.evely.financas.enums.LoanStatus;
 import com.evely.financas.enums.TransactionType;
 import com.evely.financas.exception.ObjectNotFoundException;
@@ -26,9 +27,10 @@ public class LoanService {
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
     private final BalanceService balanceService;
+    private final InvestmentEntryRepository investmentEntryRepository;
 
     // =========================================================
-    // EMPRÉSTIMO A TERCEIRO
+    // EMPRÉSTIMO A TERCEIRO (RN12)
     // =========================================================
 
     @Transactional
@@ -39,10 +41,9 @@ public class LoanService {
         Account sourceAccount = accountRepository.findById(dto.sourceAccountId())
             .orElseThrow(() -> new ObjectNotFoundException("Conta de origem não encontrada"));
 
-        // Valida saldo antes de qualquer operação
         balanceService.validarSaldo(sourceAccount, dto.totalAmount());
 
-        // Registra a saída do dinheiro
+        // Transação de saída (LOAN_OUT)
         Transaction saida = new Transaction();
         saida.setDescription("Empréstimo para: " + dto.borrowerName());
         saida.setTotalAmount(dto.totalAmount());
@@ -52,10 +53,9 @@ public class LoanService {
         saida.setSimulation(false);
         Transaction transacaoSalva = transactionRepository.save(saida);
 
-        // Baixa o saldo da conta de origem
+        // Débito imediato (RN01 — LOAN_OUT liquida na hora)
         balanceService.baixarSaldo(sourceAccount, dto.totalAmount());
 
-        // Monta o registro do empréstimo
         Loan loan = new Loan();
         loan.setLender(lender);
         loan.setBorrowerName(dto.borrowerName());
@@ -68,7 +68,6 @@ public class LoanService {
         loan.setStatus(LoanStatus.ACTIVE);
         loan.setOriginTransaction(transacaoSalva);
 
-        // Vincula ao usuário do sistema se o devedor também for usuário
         if (dto.borrowerUserId() != null) {
             User borrower = userRepository.findById(dto.borrowerUserId())
                 .orElseThrow(() -> new ObjectNotFoundException("Devedor não encontrado no sistema"));
@@ -79,7 +78,7 @@ public class LoanService {
     }
 
     // =========================================================
-    // RECEBIMENTO DE VOLTA (empréstimo a terceiro)
+    // RECEBIMENTO DE VOLTA
     // =========================================================
 
     @Transactional
@@ -92,12 +91,11 @@ public class LoanService {
         }
 
         BigDecimal novoTotal = loan.getPaidAmount().add(valorRecebido);
-
         if (novoTotal.compareTo(loan.getTotalAmount()) > 0) {
             throw new RuntimeException("Valor recebido ultrapassa o total do empréstimo.");
         }
 
-        // Registra a entrada do dinheiro de volta na conta
+        // Registra a entrada do dinheiro de volta
         Transaction entrada = new Transaction();
         entrada.setDescription("Recebimento de empréstimo: " + loan.getBorrowerName());
         entrada.setTotalAmount(valorRecebido);
@@ -107,7 +105,6 @@ public class LoanService {
         entrada.setSimulation(false);
         transactionRepository.save(entrada);
 
-        // Dinheiro volta para a conta de origem — estava faltando isso
         balanceService.subirSaldo(loan.getSourceAccount(), valorRecebido);
 
         loan.setPaidAmount(novoTotal);
@@ -119,7 +116,19 @@ public class LoanService {
     }
 
     // =========================================================
-    // AUTO-EMPRÉSTIMO
+    // AUTO-EMPRÉSTIMO (RN11)
+    //
+    // REGRA DE USO:
+    //   - COM intenção de repor → este endpoint (cria contrato de reposição)
+    //   - SEM intenção de repor → InvestmentEntry WITHDRAWAL + transação EXPENSE normal
+    //
+    // ✅ FIX: Removidas as Transactions duplicadas (EXPENSE + INCOME)
+    //    que causavam double-debit ao pagar as parcelas.
+    //    O fluxo correto é:
+    //      1. InvestmentEntry WITHDRAWAL (rastreia a saída do investimento)
+    //      2. subirSaldo na conta destino (dinheiro chega na corrente)
+    //      3. Transaction INTERNAL_REPAYMENT com parcelas flexíveis
+    //         (ao pagar cada parcela: debitá na corrente + InvestmentEntry DEPOSIT)
     // =========================================================
 
     @Transactional
@@ -137,59 +146,70 @@ public class LoanService {
             throw new RuntimeException("Conta de origem e destino não podem ser a mesma.");
         }
 
-        // Valida saldo antes de qualquer operação
+        // Valida saldo da conta de origem
         balanceService.validarSaldo(sourceAccount, dto.totalAmount());
 
-        // Registra transação de saída
-        Transaction saida = new Transaction();
-        saida.setDescription("Auto-empréstimo — saída de: " + sourceAccount.getName());
-        saida.setTotalAmount(dto.totalAmount());
-        saida.setType(TransactionType.EXPENSE);
+        // 1. Registra a saída como InvestmentEntry WITHDRAWAL (rastreia o movimento no investimento)
+        InvestmentEntry saida = new InvestmentEntry();
         saida.setAccount(sourceAccount);
-        saida.setPurchaseDate(LocalDate.now());
-        saida.setSimulation(false);
-        transactionRepository.save(saida);
+        saida.setType(InvestmentEntryType.WITHDRAWAL);
+        saida.setAmount(dto.totalAmount());
+        saida.setEntryDate(LocalDate.now());
+        saida.setNotes("Auto-empréstimo — saída para: " + targetAccount.getName()
+                       + (dto.notes() != null ? " | " + dto.notes() : ""));
+        investmentEntryRepository.save(saida);
 
-        // Registra transação de entrada
-        Transaction entrada = new Transaction();
-        entrada.setDescription("Auto-empréstimo — entrada em: " + targetAccount.getName());
-        entrada.setTotalAmount(dto.totalAmount());
-        entrada.setType(TransactionType.INCOME);
-        entrada.setAccount(targetAccount);
-        entrada.setPurchaseDate(LocalDate.now());
-        entrada.setSimulation(false);
-        transactionRepository.save(entrada);
+        // 2. Credita o valor na conta destino (dinheiro chega na corrente)
+        balanceService.subirSaldo(targetAccount, dto.totalAmount());
 
-        // Transfere atomicamente — baixar + subir em uma operação só
-        balanceService.transferir(sourceAccount, targetAccount, dto.totalAmount());
-
-        // Cria as parcelas de reposição
-        BigDecimal valorParcela = dto.totalAmount()
-            .divide(BigDecimal.valueOf(dto.parcelas()), 2, RoundingMode.HALF_UP);
-
+        // 3. Cria o contrato de reposição (INTERNAL_REPAYMENT)
+        //    account = onde o dinheiro SAI ao pagar (conta corrente/destino)
+        //    destinationAccount = onde o dinheiro VOLTA (investimento/origem)
         Transaction reposicao = new Transaction();
-        reposicao.setDescription("Reposição auto-empréstimo — " + sourceAccount.getName());
+        reposicao.setDescription("Reposição auto-empréstimo → " + sourceAccount.getName());
         reposicao.setTotalAmount(dto.totalAmount());
         reposicao.setType(TransactionType.INTERNAL_REPAYMENT);
-        reposicao.setAccount(targetAccount);           // sai da corrente
-        reposicao.setDestinationAccount(sourceAccount); // volta para a reserva
+        reposicao.setAccount(targetAccount);
+        reposicao.setDestinationAccount(sourceAccount);
         reposicao.setPurchaseDate(LocalDate.now());
         reposicao.setSimulation(false);
 
-        for (int i = 1; i <= dto.parcelas(); i++) {
-            Installment parcela = new Installment();
-            parcela.setInstallmentNumber(i);
-            parcela.setAmount(valorParcela);
-            parcela.setStatus(InstallmentStatus.PENDING);
-            parcela.setDueDate(LocalDate.now().plusMonths(i));
-            parcela.setPayer(user);
-            parcela.setTransaction(reposicao);
-            reposicao.getInstallments().add(parcela);
+        // Parcelas com datas e valores flexíveis (RN11)
+        if (dto.installments() != null && !dto.installments().isEmpty()) {
+            // Parcelas personalizadas (valores e datas diferentes)
+            for (int i = 0; i < dto.installments().size(); i++) {
+                var parcDTO = dto.installments().get(i);
+                Installment parcela = new Installment();
+                parcela.setInstallmentNumber(i + 1);
+                parcela.setAmount(parcDTO.amount());
+                parcela.setDueDate(parcDTO.dueDate());
+                parcela.setStatus(InstallmentStatus.PENDING);
+                parcela.setPayer(user);
+                parcela.setTransaction(reposicao);
+                reposicao.getInstallments().add(parcela);
+            }
+        } else if (dto.totalParcelas() > 0) {
+            // Parcelas iguais, mensais a partir do mês seguinte
+            BigDecimal valorParcela = dto.totalAmount()
+                .divide(BigDecimal.valueOf(dto.totalParcelas()), 2, RoundingMode.HALF_UP);
+            for (int i = 1; i <= dto.totalParcelas(); i++) {
+                Installment parcela = new Installment();
+                parcela.setInstallmentNumber(i);
+                parcela.setAmount(valorParcela);
+                parcela.setDueDate(LocalDate.now().plusMonths(i));
+                parcela.setStatus(InstallmentStatus.PENDING);
+                parcela.setPayer(user);
+                parcela.setTransaction(reposicao);
+                reposicao.getInstallments().add(parcela);
+            }
+        } else {
+            throw new RuntimeException(
+                "Informe as parcelas de reposição ou o número total de parcelas.");
         }
 
         transactionRepository.save(reposicao);
 
-        // Registra o empréstimo
+        // 4. Registra o empréstimo
         Loan loan = new Loan();
         loan.setLender(user);
         loan.setSelfLoan(true);
@@ -215,11 +235,9 @@ public class LoanService {
 
         BigDecimal novoTotal = loan.getPaidAmount().add(valorPago);
         loan.setPaidAmount(novoTotal);
-
         if (novoTotal.compareTo(loan.getTotalAmount()) >= 0) {
             loan.setStatus(LoanStatus.PAID);
         }
-
         loanRepository.save(loan);
     }
 
@@ -235,7 +253,6 @@ public class LoanService {
         if (!loan.getLender().getId().equals(userId)) {
             throw new RuntimeException("Você não tem permissão para perdoar este empréstimo.");
         }
-
         if (loan.isSelfLoan()) {
             throw new RuntimeException("Não é possível perdoar um auto-empréstimo.");
         }

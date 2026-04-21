@@ -3,6 +3,7 @@ package com.evely.financas.service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -12,10 +13,8 @@ import com.evely.financas.enums.InvoiceStatus;
 import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Account;
 import com.evely.financas.model.CreditCardInvoice;
-import com.evely.financas.model.Snapshot;
 import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.CreditCardInvoiceRepository;
-import com.evely.financas.repository.SnapshotRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -26,11 +25,15 @@ public class CreditCardInvoiceService {
 
     private final CreditCardInvoiceRepository invoiceRepository;
     private final AccountRepository accountRepository;
-    private final SnapshotRepository snapshotRepository;
+    // ✅ SnapshotRepository REMOVIDO — limite disponível agora está em account.balance
 
+    /**
+     * Resolve em qual mês a primeira parcela de uma compra no cartão
+     * deve entrar, com base no dia de fechamento da fatura.
+     * Se a compra for APÓS o dia de fechamento, vai para o mês seguinte.
+     */
     public LocalDate resolverMesDaPrimeiraParcela(Account account, LocalDate purchaseDate) {
         int closingDay = account.getClosingDay();
-
         if (purchaseDate.getDayOfMonth() > closingDay) {
             return purchaseDate.plusMonths(1).withDayOfMonth(1);
         }
@@ -45,9 +48,14 @@ public class CreditCardInvoiceService {
     }
 
     private CreditCardInvoice criarNovaFatura(Account account, int mes, int ano) {
-        LocalDate closingDate = LocalDate.of(ano, mes, account.getClosingDay());
+        // ✅ Proteção contra closingDay inválido para o mês (ex: 31 em fevereiro)
+        int diasNoMes = YearMonth.of(ano, mes).lengthOfMonth();
+        int closingDia = Math.min(account.getClosingDay(), diasNoMes);
+        LocalDate closingDate = LocalDate.of(ano, mes, closingDia);
 
-        LocalDate dueDate = closingDate.plusMonths(1).withDayOfMonth(account.getDueDay());
+        // Vencimento = dia seguinte ao fechamento + 1 mês (ex: fecha dia 10, vence dia 10 do mês seguinte)
+        int dueDia = Math.min(account.getDueDay(), YearMonth.of(ano, mes + 1 > 12 ? 1 : mes + 1).lengthOfMonth());
+        LocalDate dueDate = closingDate.plusMonths(1).withDayOfMonth(dueDia);
 
         CreditCardInvoice invoice = new CreditCardInvoice();
         invoice.setAccount(account);
@@ -78,57 +86,56 @@ public class CreditCardInvoiceService {
         }
 
         BigDecimal novoPagoTotal = invoice.getPaidAmount().add(valorPago);
-
         if (novoPagoTotal.compareTo(invoice.getTotalAmount()) > 0) {
             throw new RuntimeException("Valor informado ultrapassa o total da fatura.");
         }
 
-        invoice.setPaidAmount(novoPagoTotal);
+        // RN02: aqui o saldo bancário da conta de pagamento (corrente/carteira)
+        // é debitado. O cartão em si tem o limite devolvido.
+        // Quem chama este método deve também debitar a conta corrente usada para pagar.
+        // Exemplo: balanceService.baixarSaldo(contaCorrente, valorPago) ANTES de chamar aqui.
 
+        invoice.setPaidAmount(novoPagoTotal);
         if (novoPagoTotal.compareTo(invoice.getTotalAmount()) == 0) {
             invoice.setStatus(InvoiceStatus.PAID);
             invoice.setPaidAt(LocalDateTime.now());
         } else {
             invoice.setStatus(InvoiceStatus.PARTIALLY_PAID);
         }
-
         invoiceRepository.save(invoice);
 
+        // ✅ Devolve o limite disponível ao cartão via update atômico na coluna balance
         devolverLimiteAoCartao(invoice.getAccount(), valorPago);
 
         return invoice;
     }
 
-
     @Transactional
     public void fecharFaturasVencidas() {
-        List<CreditCardInvoice> vencidas = invoiceRepository
-            .findAbertasVencidas(LocalDate.now());
-
+        List<CreditCardInvoice> vencidas = invoiceRepository.findAbertasVencidas(LocalDate.now());
         vencidas.forEach(inv -> {
             inv.setStatus(InvoiceStatus.CLOSED);
             invoiceRepository.save(inv);
         });
-
         log.info("Faturas fechadas: {}", vencidas.size());
     }
 
+    /**
+     * ✅ Devolve o limite ao cartão via update atômico (incrementBalance).
+     * Anteriormente usava Snapshot — substituído pela coluna balance.
+     * Garante que o limite não ultrapasse o cardLimit configurado.
+     */
     private void devolverLimiteAoCartao(Account account, BigDecimal valor) {
-        Snapshot ultimoSnapshot = snapshotRepository
-            .findFirstByAccountOrderBySnapshotDateDesc(account)
-            .orElseThrow(() -> new ObjectNotFoundException("Snapshot do cartão não encontrado"));
+        // Incrementa o limite disponível
+        accountRepository.incrementBalance(account.getId(), valor);
 
-        BigDecimal novoLimiteDisponivel = ultimoSnapshot.getAmount().add(valor);
-
-        if (novoLimiteDisponivel.compareTo(account.getCardLimit()) > 0) {
-            novoLimiteDisponivel = account.getCardLimit();
-        }
-
-        Snapshot novoSnapshot = new Snapshot();
-        novoSnapshot.setAccount(account);
-        novoSnapshot.setAmount(novoLimiteDisponivel);
-        novoSnapshot.setSnapshotDate(LocalDateTime.now());
-        snapshotRepository.save(novoSnapshot);
+        // Garante que não ultrapasse o limite máximo do cartão
+        // Re-lê o saldo atual pós-incremento
+        accountRepository.findById(account.getId()).ifPresent(acc -> {
+            if (acc.getCardLimit() != null && acc.getBalance().compareTo(acc.getCardLimit()) > 0) {
+                accountRepository.setBalance(acc.getId(), acc.getCardLimit());
+            }
+        });
     }
 
     public List<CreditCardInvoice> listarFaturasDoCartao(UUID accountId) {

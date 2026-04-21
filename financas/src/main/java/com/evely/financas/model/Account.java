@@ -55,10 +55,27 @@ public class Account {
     private boolean shared;
 
     /**
-     * Campo transiente: não é persistido no banco.
-     * Usado apenas na criação da conta para definir o saldo inicial
-     * (snapshot). Permite que o usuário informe quanto já tem na conta
-     * no momento do cadastro — especialmente útil no onboarding.
+     * ✅ NOVO: Saldo atual da conta — fonte única de verdade para CHECKING, CASH e CREDIT_CARD.
+     *
+     * CHECKING / CASH:    saldo disponível em reais.
+     * CREDIT_CARD:        limite disponível (cardLimit - valor usado na fatura aberta).
+     *                     Diminui quando uma compra é registrada no cartão.
+     *                     Aumenta quando a fatura é paga.
+     * INVESTMENT:         NÃO usa esta coluna. Saldo é calculado via InvestmentEntry
+     *                     (aportes + rendimentos - resgates) para manter rastreabilidade.
+     *
+     * A coluna foi adicionada para substituir a tabela snapshots como
+     * "fonte de saldo atual", permitindo updates atômicos no banco
+     * e eliminando race conditions de leitura-modificação-escrita.
+     *
+     * ddl-auto=update adiciona a coluna automaticamente no próximo start.
+     */
+    @Column(name = "balance", nullable = false)
+    private BigDecimal balance = BigDecimal.ZERO;
+
+    /**
+     * Campo transiente: não é persistido.
+     * Usado no onboarding para informar o saldo inicial da conta.
      */
     @Transient
     private BigDecimal initialBalance;

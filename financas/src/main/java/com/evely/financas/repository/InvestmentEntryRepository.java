@@ -9,7 +9,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import com.evely.financas.enums.InvestmentEntryType;
 import com.evely.financas.model.InvestmentEntry;
-import org.springframework.data.jpa.repository.Query;
 
 @Repository
 public interface InvestmentEntryRepository extends JpaRepository<InvestmentEntry, UUID> {
@@ -49,7 +48,7 @@ public interface InvestmentEntryRepository extends JpaRepository<InvestmentEntry
     """)
     List<Object[]> monthlyHistoryByAccount(@Param("accountId") UUID accountId);
 
-    // Substitua o método somarAportesMensais atual por este:
+    // ✅ CORRIGIDO: query usando os campos reais da entidade InvestmentEntry
     @Query("""
         SELECT COALESCE(SUM(e.amount), 0)
         FROM InvestmentEntry e
@@ -59,9 +58,8 @@ public interface InvestmentEntryRepository extends JpaRepository<InvestmentEntry
         AND YEAR(e.entryDate) = :year
     """)
     BigDecimal somarAportesMensais(
-        @Param("userId") UUID userId, 
-        @Param("month") int month, 
+        @Param("userId") UUID userId,
+        @Param("month") int month,
         @Param("year") int year
     );
-
 }
