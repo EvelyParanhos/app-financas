@@ -1,7 +1,6 @@
 package com.evely.financas.controller;
 
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import com.evely.financas.model.Account;
 import com.evely.financas.model.User;
 import com.evely.financas.repository.AccountRepository;
@@ -12,14 +11,6 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @RequestMapping("api/accounts")
@@ -34,14 +25,28 @@ public class AccountController {
             @RequestBody Account account,
             @AuthenticationPrincipal User user) {
         account.setOwner(user);
-        Account accountSalva = accountService.salvar(account);
-        return ResponseEntity.status(201).body(accountSalva);
+        return ResponseEntity.status(201).body(accountService.salvar(account));
     }
 
+    /**
+     * ✅ ITEM 10: Parâmetro opcional includePartner.
+     *
+     * GET /api/accounts                      — apenas as contas do usuário
+     * GET /api/accounts?includePartner=true  — contas do usuário + contas
+     *                                          compartilhadas do parceiro
+     *
+     * Uso típico: formulário de nova transação, onde o usuário precisa
+     * ver as contas compartilhadas do casal para lançar nelas.
+     */
     @GetMapping
-    public ResponseEntity<List<Account>> listarContas(@AuthenticationPrincipal User user) {
-        List<Account> contas = accountRepository.findByOwnerId(user.getId());
-        return ResponseEntity.ok(contas);
+    public ResponseEntity<List<Account>> listarContas(
+            @RequestParam(defaultValue = "false") boolean includePartner,
+            @AuthenticationPrincipal User user) {
+
+        if (includePartner) {
+            return ResponseEntity.ok(accountService.listarComParceiroOpcional(user.getId()));
+        }
+        return ResponseEntity.ok(accountRepository.findByOwnerId(user.getId()));
     }
 
     @DeleteMapping("/{id}")
@@ -65,8 +70,7 @@ public class AccountController {
             .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
         if (!existente.getOwner().getId().equals(user.getId()))
             throw new RuntimeException("Sem permissão para editar esta conta.");
-        Account atualizada = accountService.editar(id, account);
-        return ResponseEntity.ok(atualizada);
+        return ResponseEntity.ok(accountService.editar(id, account));
     }
 
     @PatchMapping("/{accountId}/visibility")
@@ -82,14 +86,6 @@ public class AccountController {
         return ResponseEntity.ok().build();
     }
 
-    /**
-     * Define (ou corrige) o saldo atual de uma conta.
-     * Usado principalmente no onboarding para informar quanto o usuário
-     * já tem em cada conta no momento do cadastro, incluindo a carteira CASH
-     * criada automaticamente no registro.
-     *
-     * PATCH /api/accounts/{id}/balance?amount=1500.00
-     */
     @PatchMapping("/{id}/balance")
     public ResponseEntity<Void> definirSaldoInicial(
             @PathVariable UUID id,

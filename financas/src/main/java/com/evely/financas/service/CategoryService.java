@@ -9,6 +9,7 @@ import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Category;
 import com.evely.financas.model.User;
 import com.evely.financas.repository.CategoryRepository;
+import com.evely.financas.repository.PartnershipRepository;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -16,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final PartnershipRepository partnershipRepository;
 
     public Category create(CategoryDTO dto, User owner) {
         Category category = new Category();
@@ -32,6 +34,23 @@ public class CategoryService {
         return categoryRepository.findByOwnerAndActiveTrue(owner);
     }
 
+    /**
+     * Retorna as categorias ativas do usuário + as do parceiro (se houver).
+     * Usado no formulário de nova transação em contas compartilhadas.
+     *
+     * Se o usuário não tiver parceiro, retorna apenas as suas próprias.
+     */
+    public List<Category> listarCasal(UUID userId) {
+        return partnershipRepository.findByUserId(userId)
+            .map(p -> {
+                UUID partnerId = p.getUserA().getId().equals(userId)
+                    ? p.getUserB().getId()
+                    : p.getUserA().getId();
+                return categoryRepository.findActivasByOwnerIds(userId, partnerId);
+            })
+            .orElseGet(() -> categoryRepository.findByOwnerIdAndActiveTrue(userId));
+    }
+
     public void softDelete(UUID categoryId, User currentUser) {
         Category category = categoryRepository.findById(categoryId)
             .orElseThrow(() -> new ObjectNotFoundException("Categoria não encontrada"));
@@ -46,7 +65,6 @@ public class CategoryService {
         validarDono(categoria, currentUser);
         categoria.setName(dto.name());
         categoria.setType(dto.type());
-        // Atualiza ícone e cor apenas se fornecidos
         if (dto.icon() != null) categoria.setIcon(dto.icon());
         if (dto.color() != null) categoria.setColor(dto.color());
         return categoryRepository.save(categoria);

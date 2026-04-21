@@ -15,6 +15,12 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
     List<Category> findByOwnerAndActiveTrue(User owner);
 
     /**
+     * Versão por UUID — evita buscar o User inteiro só para listar categorias.
+     * Usada em listarCasal quando o usuário não tem parceiro.
+     */
+    List<Category> findByOwnerIdAndActiveTrue(UUID ownerId);
+
+    /**
      * Retorna as categorias ativas de dois usuários (eu + parceiro).
      * Usado no dashboard do casal para que ambos vejam as categorias um do outro
      * ao registrar transações em contas compartilhadas.

@@ -3,10 +3,12 @@ package com.evely.financas.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import com.evely.financas.dto.TransactionItemDTO;
 import com.evely.financas.enums.AccountType;
 import com.evely.financas.enums.InstallmentStatus;
 import com.evely.financas.enums.TransactionType;
@@ -32,6 +34,39 @@ public class TransactionService {
     private final BalanceService balanceService;
     private final AccountRepository accountRepository;
     private final CreditCardInvoiceService creditCardInvoiceService;
+
+    // =========================================================
+    // LISTAGEM COM FILTROS — GET /api/transactions
+    // =========================================================
+
+    /**
+     * Lista transações reais do usuário no mês/ano informado.
+     *
+     * @param type       Filtra pelo tipo (EXPENSE, INCOME, TRANSFER...). Null = todos.
+     * @param categoryId Filtra pela categoria. Null = todas.
+     */
+    public List<TransactionItemDTO> listarComFiltros(UUID userId, int month, int year,
+                                                      TransactionType type, UUID categoryId) {
+        // Passa o enum como String para o JPQL lidar corretamente com null
+        String typeStr = type != null ? type.name() : null;
+
+        return transactionRepository
+            .findComFiltros(userId, month, year, typeStr, categoryId)
+            .stream()
+            .map(t -> new TransactionItemDTO(
+                t.getId(),
+                t.getDescription(),
+                t.getCategory() != null ? t.getCategory().getName() : "Sem Categoria",
+                t.getTotalAmount(),
+                t.getPurchaseDate(),
+                t.getType().name()
+            ))
+            .toList();
+    }
+
+    // =========================================================
+    // REGISTRAR TRANSAÇÃO
+    // =========================================================
 
     @Transactional
     public Transaction registrarTransacao(Transaction transacao, int totalParcelas, UUID userId) {
@@ -79,7 +114,6 @@ public class TransactionService {
                 parcela.setDueDate(
                     mesDaParcela.withDayOfMonth(transacao.getAccount().getDueDay())
                 );
-
                 if (!transacao.isSimulation()) {
                     CreditCardInvoice invoice = creditCardInvoiceService.buscarOuCriarFatura(
                         transacao.getAccount(),
@@ -98,18 +132,6 @@ public class TransactionService {
 
         Transaction transacaoSalva = transactionRepository.save(transacao);
 
-        // ----------------------------------------------------------------
-        // RN01 — Regra de Efeito de Liquidação
-        //
-        // CREDIT_CARD: baixa o limite disponível do cartão imediatamente.
-        // TRANSFER:    move saldo entre contas imediatamente.
-        //
-        // EXPENSE / INCOME em conta corrente ou carteira:
-        //   O saldo SÓ muda quando a parcela for marcada como PAGA
-        //   pelo usuário no checklist (pagarParcela).
-        //   Isso aplica tanto para pagamentos à vista quanto parcelados,
-        //   garantindo que o checklist seja a única fonte de verdade.
-        // ----------------------------------------------------------------
         if (!transacaoSalva.isSimulation()) {
             if (ehCartao) {
                 balanceService.baixarSaldo(
@@ -123,12 +145,14 @@ public class TransactionService {
                     transacaoSalva.getTotalAmount()
                 );
             }
-            // Para EXPENSE, INCOME e LOAN_OUT em conta corrente/carteira:
-            // parcelas ficam PENDING → saldo atualiza quando marcadas como pagas.
         }
 
         return transacaoSalva;
     }
+
+    // =========================================================
+    // EFETIVAR SIMULAÇÃO
+    // =========================================================
 
     @Transactional
     public void efetivarSimulacao(UUID transactionId) {
@@ -168,10 +192,13 @@ public class TransactionService {
                 transacao.getTotalAmount()
             );
         }
-        // Para EXPENSE/INCOME parcelados: saldo muda quando cada parcela for paga
 
         transactionRepository.save(transacao);
     }
+
+    // =========================================================
+    // EXCLUIR
+    // =========================================================
 
     @Transactional
     public void excluir(UUID id, UUID userId) {
@@ -182,10 +209,7 @@ public class TransactionService {
             throw new RuntimeException("Sem permissão para excluir esta transação.");
         }
 
-        boolean temParcelaPaga = installmentRepository
-            .existeParcellaPagaParaTransacao(id);
-
-        if (temParcelaPaga) {
+        if (installmentRepository.existeParcellaPagaParaTransacao(id)) {
             throw new RuntimeException(
                 "Não é possível excluir esta transação pois já existem parcelas pagas. " +
                 "Para desfazer, registre um estorno.");

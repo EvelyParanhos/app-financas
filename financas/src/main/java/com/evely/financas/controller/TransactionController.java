@@ -1,19 +1,17 @@
 package com.evely.financas.controller;
 
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import com.evely.financas.dto.TransactionItemDTO;
+import com.evely.financas.dto.TransactionResponseDTO;
+import com.evely.financas.enums.TransactionType;
 import com.evely.financas.model.Transaction;
 import com.evely.financas.model.User;
 import com.evely.financas.service.TransactionService;
 import lombok.RequiredArgsConstructor;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
 
 @RestController
 @RequestMapping("/api/transactions")
@@ -22,32 +20,72 @@ public class TransactionController {
 
     private final TransactionService transactionService;
 
+    /**
+     * ✅ ITEM 7: Listagem com filtros opcionais.
+     *
+     * GET /api/transactions?month=4&year=2026
+     * GET /api/transactions?month=4&year=2026&type=EXPENSE
+     * GET /api/transactions?month=4&year=2026&categoryId=uuid
+     */
+    @GetMapping
+    public ResponseEntity<List<TransactionItemDTO>> listar(
+            @RequestParam int month,
+            @RequestParam int year,
+            @RequestParam(required = false) TransactionType type,
+            @RequestParam(required = false) UUID categoryId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(
+            transactionService.listarComFiltros(user.getId(), month, year, type, categoryId)
+        );
+    }
+
+    /**
+     * ✅ ITEM 8: Agora retorna o objeto criado (TransactionResponseDTO)
+     * em vez de uma String — o frontend pode atualizar a UI sem refazer GET.
+     */
     @PostMapping
-    public ResponseEntity<String> registrarTransacao(
+    public ResponseEntity<TransactionResponseDTO> registrarTransacao(
             @RequestBody Transaction transaction,
             @RequestParam(defaultValue = "1") int parcelas,
             @AuthenticationPrincipal User user) {
 
-        transactionService.registrarTransacao(transaction, parcelas, user.getId());
-        return ResponseEntity.status(201)
-            .body("Transação registrada com " + parcelas + " parcelas");
+        Transaction salva = transactionService.registrarTransacao(transaction, parcelas, user.getId());
+        return ResponseEntity.status(201).body(toResponseDTO(salva, parcelas));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(
             @PathVariable UUID id,
             @AuthenticationPrincipal User user) {
-        // userId agora é validado dentro do service (RN12 + segurança)
         transactionService.excluir(id, user.getId());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/efetivar/{simulationId}")
-    public ResponseEntity<String> efetivarSimulacao(
-            @PathVariable UUID simulationId) {
+    public ResponseEntity<String> efetivarSimulacao(@PathVariable UUID simulationId) {
         transactionService.efetivarSimulacao(simulationId);
-        return ResponseEntity.status(200)
-            .body("Perfeito! Deixou de ser uma simulação e passou a ser " +
-                  "uma transação real! Seu dashboard atualizou!");
+        return ResponseEntity.ok(
+            "Perfeito! Deixou de ser uma simulação e passou a ser " +
+            "uma transação real! Seu dashboard atualizou!");
+    }
+
+    // -------------------------------------------------------------------------
+    // HELPER
+    // -------------------------------------------------------------------------
+
+    private TransactionResponseDTO toResponseDTO(Transaction t, int installmentCount) {
+        return new TransactionResponseDTO(
+            t.getId(),
+            t.getDescription(),
+            t.getTotalAmount(),
+            t.getPurchaseDate(),
+            t.getAccount() != null ? t.getAccount().getId() : null,
+            t.getAccount() != null ? t.getAccount().getName() : null,
+            t.getCategory() != null ? t.getCategory().getId() : null,
+            t.getCategory() != null ? t.getCategory().getName() : null,
+            t.getType(),
+            t.isSimulation(),
+            installmentCount
+        );
     }
 }

@@ -22,7 +22,6 @@ public class PartnershipService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado"));
 
-        // ✅ Verifica se já tem parceria ativa
         if (partnershipRepository.findByUserId(userId).isPresent()) {
             throw new RuntimeException("Você já possui uma parceria ativa.");
         }
@@ -43,17 +42,14 @@ public class PartnershipService {
         User userB = userRepository.findById(convidadoId)
             .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado."));
 
-        // ✅ Impede autoconexão
         if (userA.getId().equals(userB.getId())) {
             throw new RuntimeException("Você não pode criar uma parceria consigo mesmo.");
         }
 
-        // ✅ Valida expiração do convite
         if (userA.getInviteExpiry() == null || userA.getInviteExpiry().isBefore(LocalDateTime.now())) {
             throw new RuntimeException("Este código de convite expirou. Peça um novo.");
         }
 
-        // ✅ Verifica se algum dos dois já tem parceria ativa
         if (partnershipRepository.findByUserId(userA.getId()).isPresent()) {
             throw new RuntimeException("O usuário que enviou o convite já possui uma parceria ativa.");
         }
@@ -66,9 +62,24 @@ public class PartnershipService {
         partnership.setUserB(userB);
         partnershipRepository.save(partnership);
 
-        // Limpa o código para não ser reutilizado
         userA.setInviteCode(null);
         userA.setInviteExpiry(null);
         userRepository.save(userA);
+    }
+
+    /**
+     * ✅ ITEM 9: Dissolve a parceria ativa do usuário.
+     *
+     * ⚠️ EFEITO COLATERAL IMPORTANTE:
+     * Após a dissolução, contas compartilhadas permanecem existindo no banco —
+     * apenas o parceiro perde acesso a elas via API.
+     * Transações e parcelas existentes com pagador do ex-parceiro também permanecem.
+     * Não há cascade automático para preservar o histórico financeiro.
+     */
+    @Transactional
+    public void dissolverParceria(UUID userId) {
+        Partnership partnership = partnershipRepository.findByUserId(userId)
+            .orElseThrow(() -> new RuntimeException("Você não possui uma parceria ativa."));
+        partnershipRepository.delete(partnership);
     }
 }

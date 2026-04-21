@@ -2,7 +2,9 @@ package com.evely.financas.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import com.evely.financas.enums.AccountType;
 import com.evely.financas.enums.InvestmentEntryType;
@@ -90,39 +92,47 @@ public class AccountService {
         accountRepository.setBalance(accountId, novoSaldo);
     }
 
-    /**
-     * Busca uma conta validando que o usuário tem permissão de uso.
-     * Permite acesso se:
-     *   a) o usuário é o dono da conta, OU
-     *   b) a conta é compartilhada (is_shared = true) e o dono é parceiro do usuário.
-     *
-     * Usado pelo RecurringTransactionController para permitir que
-     * um parceiro crie recorrentes apontando para a conta de investimento
-     * compartilhada do outro (ex: "Reserva do Casal" de posse do marido).
-     */
     public Account buscarContaComAcessoPermitido(UUID accountId, UUID userId) {
         Account conta = accountRepository.findById(accountId)
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
 
-        // Dono direto — acesso irrestrito
-        if (conta.getOwner().getId().equals(userId)) {
-            return conta;
-        }
+        if (conta.getOwner().getId().equals(userId)) return conta;
 
-        // Conta compartilhada de um parceiro ativo
         boolean parceiroDaConta = conta.isShared()
             && partnershipRepository.findByUserId(userId)
                 .map(p -> p.getUserA().getId().equals(conta.getOwner().getId())
                        || p.getUserB().getId().equals(conta.getOwner().getId()))
                 .orElse(false);
 
-        if (parceiroDaConta) {
-            return conta;
-        }
+        if (parceiroDaConta) return conta;
 
         throw new RuntimeException(
             "Você não tem permissão para usar esta conta. " +
             "Contas de parceiros só são acessíveis se estiverem marcadas como compartilhadas.");
+    }
+
+    /**
+     * ✅ ITEM 10: Lista as contas do usuário + as contas compartilhadas do parceiro.
+     *
+     * Usado pelo frontend ao criar transações ou recorrentes —
+     * precisa ver também as contas do casal para poder lançar nelas.
+     *
+     * Contas retornadas do parceiro: apenas as marcadas como is_shared = true.
+     * Contas próprias: todas (independente de is_shared).
+     */
+    public List<Account> listarComParceiroOpcional(UUID userId) {
+        List<Account> minhas = accountRepository.findByOwnerId(userId);
+
+        List<Account> doParceiroShared = partnershipRepository.findByUserId(userId)
+            .map(p -> {
+                UUID partnerId = p.getUserA().getId().equals(userId)
+                    ? p.getUserB().getId()
+                    : p.getUserA().getId();
+                return accountRepository.findByOwnerIdAndSharedTrue(partnerId);
+            })
+            .orElse(List.of());
+
+        return Stream.concat(minhas.stream(), doParceiroShared.stream()).toList();
     }
 
     public void excluir(UUID id) {
