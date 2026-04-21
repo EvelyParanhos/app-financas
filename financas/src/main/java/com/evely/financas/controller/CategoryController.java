@@ -19,25 +19,46 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @PostMapping
-    public ResponseEntity<Category> create(@RequestBody CategoryDTO dto, @AuthenticationPrincipal User user) {
+    public ResponseEntity<Category> create(
+            @RequestBody CategoryDTO dto,
+            @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(categoryService.create(dto, user));
     }
 
+    /** Categorias do próprio usuário. */
     @GetMapping
     public ResponseEntity<List<Category>> listar(@AuthenticationPrincipal User user) {
-        List<Category> lista = categoryService.listarMinhas(user);
-        return ResponseEntity.ok(lista);
+        return ResponseEntity.ok(categoryService.listarMinhas(user));
+    }
+
+    /**
+     * Categorias do casal (eu + parceiro).
+     *
+     * Use este endpoint no formulário de cadastro de transação em contas compartilhadas,
+     * para que ambos possam usar as categorias um do outro sem precisar recriá-las.
+     *
+     * Se o usuário não tiver parceiro, retorna apenas as suas próprias.
+     *
+     * GET /api/categories/casal
+     */
+    @GetMapping("/casal")
+    public ResponseEntity<List<Category>> listarCasal(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(categoryService.listarCasal(user.getId()));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable UUID id, @AuthenticationPrincipal User user) {
+    public ResponseEntity<Void> deletar(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user) {
         categoryService.softDelete(id, user);
-        return ResponseEntity.noContent().build(); 
+        return ResponseEntity.noContent().build();
     }
-    
+
     @PutMapping("/{id}")
-    public ResponseEntity<Category> editar(@PathVariable UUID id, @RequestBody CategoryDTO dto, @AuthenticationPrincipal User user) {
-        Category atualizada = categoryService.atualizar(id, dto, user);
-        return ResponseEntity.ok(atualizada);
+    public ResponseEntity<Category> editar(
+            @PathVariable UUID id,
+            @RequestBody CategoryDTO dto,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(categoryService.atualizar(id, dto, user));
     }
 }

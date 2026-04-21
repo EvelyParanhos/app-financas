@@ -1,5 +1,6 @@
 package com.evely.financas.controller;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -44,19 +45,42 @@ public class RecurringTransactionController {
         return ResponseEntity.ok(recurringRepository.findByAccountOwnerId(user.getId()));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user) {
+        recurringTransactionService.excluir(id, user.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<RecurringTransaction> editar(
+            @PathVariable UUID id,
+            @RequestBody RecurringTransaction rt,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(recurringTransactionService.editar(id, rt, user.getId()));
+    }
+
     /**
      * Materializa um item recorrente virtual para o mês/ano indicado.
-     * Chamado quando o usuário marca um item fixo do checklist como pago.
      *
      * POST /api/recurring/{id}/materialize?month=4&year=2026
+     * POST /api/recurring/{id}/materialize?month=4&year=2026&actualAmount=187.50
+     *
+     * O parâmetro actualAmount é OPCIONAL:
+     *  - Para transações FIXAS (isVariable=false): ignorado, usa estimatedAmount.
+     *  - Para transações VARIÁVEIS (isVariable=true): obrigatório para registrar
+     *    o valor real (ex: conta de luz que veio R$187,50 em vez de R$150 estimados).
+     *    Se omitido em transação variável, registra com o valor estimado como rascunho.
      */
     @PostMapping("/{id}/materialize")
     public ResponseEntity<String> materializar(
             @PathVariable UUID id,
             @RequestParam int month,
             @RequestParam int year,
+            @RequestParam(required = false) BigDecimal actualAmount,
             @AuthenticationPrincipal User user) {
-        recurringTransactionService.materializarParaMes(id, month, year, user.getId());
+        recurringTransactionService.materializarParaMes(id, month, year, user.getId(), actualAmount);
         return ResponseEntity.ok("Transação recorrente registrada com sucesso.");
     }
 }

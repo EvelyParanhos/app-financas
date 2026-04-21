@@ -16,6 +16,7 @@ import com.evely.financas.model.Account;
 import com.evely.financas.model.InvestmentEntry;
 import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.InvestmentEntryRepository;
+import com.evely.financas.repository.PartnershipRepository;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -24,37 +25,37 @@ public class InvestmentService {
 
     private final InvestmentEntryRepository entryRepository;
     private final AccountRepository accountRepository;
+    private final PartnershipRepository partnershipRepository;
 
     // =========================================================
     // LANÇAR ENTRADA (aporte, resgate ou rendimento)
     // =========================================================
 
+    /**
+     * Lança um movimento em uma conta de investimento.
+     *
+     * ✅ Regra de acesso:
+     *   - Dono da conta: sempre pode operar.
+     *   - Parceiro do dono: pode operar se a conta tiver is_shared = true.
+     *     Isso cobre o cenário "eu e meu marido depositamos na mesma reserva".
+     */
     @Transactional
     public InvestmentEntry lancarEntrada(InvestmentEntryDTO dto, UUID userId) {
         Account account = accountRepository.findById(dto.accountId())
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
 
-        // Garante que só contas de investimento aceitam esse fluxo
         if (account.getType() != AccountType.INVESTMENT) {
             throw new RuntimeException(
-                "Esta operação só é permitida em contas do tipo INVESTMENT."
-            );
+                "Esta operação só é permitida em contas do tipo INVESTMENT.");
         }
 
-        // Garante que o usuário logado é dono da conta
-        if (!account.getOwner().getId().equals(userId)) {
-            throw new RuntimeException(
-                "Você não tem permissão para lançar entradas nesta conta."
-            );
-        }
+        validarAcessoInvestimento(account, userId);
 
-        // Valida que não está tentando resgatar mais do que tem
         if (dto.type() == InvestmentEntryType.WITHDRAWAL) {
             BigDecimal saldoAtual = calcularSaldo(account.getId());
             if (dto.amount().compareTo(saldoAtual) > 0) {
                 throw new RuntimeException(
-                    "Resgate superior ao saldo disponível. Saldo atual: R$" + saldoAtual
-                );
+                    "Resgate superior ao saldo disponível. Saldo atual: R$" + saldoAtual);
             }
         }
 
@@ -69,78 +70,55 @@ public class InvestmentService {
     }
 
     // =========================================================
-    // RESUMO DE UMA CONTA DE INVESTIMENTO
+    // RESUMO DE UMA CONTA
     // =========================================================
 
     public InvestmentSummaryDTO getResumo(UUID accountId, UUID userId) {
         Account account = accountRepository.findById(accountId)
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
 
-        if (!account.getOwner().getId().equals(userId)) {
-            throw new RuntimeException("Acesso negado a esta conta.");
-        }
-
-        BigDecimal totalDeposited = entryRepository.sumByAccountAndType(
-            accountId, InvestmentEntryType.DEPOSIT
-        );
-        BigDecimal totalWithdrawn = entryRepository.sumByAccountAndType(
-            accountId, InvestmentEntryType.WITHDRAWAL
-        );
-        BigDecimal totalYield = entryRepository.sumByAccountAndType(
-            accountId, InvestmentEntryType.YIELD
-        );
-
-        BigDecimal currentBalance = totalDeposited
-            .add(totalYield)
-            .subtract(totalWithdrawn);
-
-        // Rentabilidade: (rendimento / aporte total) * 100
-        // Evita divisão por zero se não houver aportes ainda
-        BigDecimal profitability = BigDecimal.ZERO;
-        if (totalDeposited.compareTo(BigDecimal.ZERO) > 0) {
-            profitability = totalYield
-                .divide(totalDeposited, 4, RoundingMode.HALF_UP)
-                .multiply(BigDecimal.valueOf(100));
-        }
-
-        return new InvestmentSummaryDTO(
-            account.getId(),
-            account.getName(),
-            totalDeposited,
-            totalWithdrawn,
-            totalYield,
-            currentBalance,
-            profitability
-        );
+        validarAcessoInvestimento(account, userId);
+        return calcularResumo(account);
     }
 
     // =========================================================
-    // RESUMO DE TODAS AS CONTAS DE INVESTIMENTO DO USUÁRIO
+    // RESUMO GERAL DO USUÁRIO (contas próprias + compartilhadas)
     // =========================================================
 
     public List<InvestmentSummaryDTO> getResumoGeral(UUID userId) {
-        List<Account> contasInvestimento = accountRepository.findByOwnerId(userId)
+        // Contas próprias
+        List<Account> proprias = accountRepository.findByOwnerId(userId)
             .stream()
             .filter(acc -> acc.getType() == AccountType.INVESTMENT)
             .toList();
 
-        return contasInvestimento.stream()
-            .map(acc -> getResumo(acc.getId(), userId))
+        // Contas compartilhadas do parceiro (is_shared = true, dono = parceiro)
+        List<Account> compartilhadas = partnershipRepository.findByUserId(userId)
+            .map(p -> {
+                UUID partnerId = p.getUserA().getId().equals(userId)
+                    ? p.getUserB().getId()
+                    : p.getUserA().getId();
+                return accountRepository.findByOwnerIdAndSharedTrue(partnerId)
+                    .stream()
+                    .filter(acc -> acc.getType() == AccountType.INVESTMENT)
+                    .toList();
+            })
+            .orElse(List.of());
+
+        return java.util.stream.Stream.concat(proprias.stream(), compartilhadas.stream())
+            .distinct()
+            .map(this::calcularResumo)
             .toList();
     }
 
     // =========================================================
-    // HISTÓRICO DE LANÇAMENTOS
+    // HISTÓRICO
     // =========================================================
 
     public List<InvestmentEntry> getHistorico(UUID accountId, UUID userId) {
         Account account = accountRepository.findById(accountId)
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
-
-        if (!account.getOwner().getId().equals(userId)) {
-            throw new RuntimeException("Acesso negado a esta conta.");
-        }
-
+        validarAcessoInvestimento(account, userId);
         return entryRepository.findByAccountIdOrderByEntryDateDesc(accountId);
     }
 
@@ -149,16 +127,55 @@ public class InvestmentService {
     // =========================================================
 
     public BigDecimal calcularSaldo(UUID accountId) {
-        BigDecimal deposited = entryRepository.sumByAccountAndType(
-            accountId, InvestmentEntryType.DEPOSIT
-        );
-        BigDecimal withdrawn = entryRepository.sumByAccountAndType(
-            accountId, InvestmentEntryType.WITHDRAWAL
-        );
-        BigDecimal yield = entryRepository.sumByAccountAndType(
-            accountId, InvestmentEntryType.YIELD
-        );
-
+        BigDecimal deposited = entryRepository.sumByAccountAndType(accountId, InvestmentEntryType.DEPOSIT);
+        BigDecimal withdrawn = entryRepository.sumByAccountAndType(accountId, InvestmentEntryType.WITHDRAWAL);
+        BigDecimal yield    = entryRepository.sumByAccountAndType(accountId, InvestmentEntryType.YIELD);
         return deposited.add(yield).subtract(withdrawn);
+    }
+
+    // =========================================================
+    // PRIVADO
+    // =========================================================
+
+    private InvestmentSummaryDTO calcularResumo(Account account) {
+        BigDecimal totalDeposited = entryRepository.sumByAccountAndType(account.getId(), InvestmentEntryType.DEPOSIT);
+        BigDecimal totalWithdrawn = entryRepository.sumByAccountAndType(account.getId(), InvestmentEntryType.WITHDRAWAL);
+        BigDecimal totalYield     = entryRepository.sumByAccountAndType(account.getId(), InvestmentEntryType.YIELD);
+        BigDecimal currentBalance = totalDeposited.add(totalYield).subtract(totalWithdrawn);
+
+        BigDecimal profitability = BigDecimal.ZERO;
+        if (totalDeposited.compareTo(BigDecimal.ZERO) > 0) {
+            profitability = totalYield
+                .divide(totalDeposited, 4, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100));
+        }
+
+        return new InvestmentSummaryDTO(
+            account.getId(), account.getName(),
+            totalDeposited, totalWithdrawn, totalYield,
+            currentBalance, profitability
+        );
+    }
+
+    /**
+     * Valida se o usuário pode operar na conta de investimento:
+     * - É o dono, OU
+     * - É parceiro do dono E a conta é compartilhada (is_shared = true).
+     */
+    private void validarAcessoInvestimento(Account account, UUID userId) {
+        boolean isDono = account.getOwner().getId().equals(userId);
+        if (isDono) return;
+
+        // Verifica se é parceiro e a conta é compartilhada
+        boolean eParceiroDaConta = account.isShared()
+            && partnershipRepository.findByUserId(account.getOwner().getId())
+                .map(p -> p.getUserA().getId().equals(userId)
+                       || p.getUserB().getId().equals(userId))
+                .orElse(false);
+
+        if (!eParceiroDaConta) {
+            throw new RuntimeException(
+                "Você não tem permissão para operar nesta conta de investimento.");
+        }
     }
 }
