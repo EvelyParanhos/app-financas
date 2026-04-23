@@ -65,4 +65,15 @@ public class RecurringTransactionController {
         recurringTransactionService.materializarParaMes(id, month, year, user.getId(), actualAmount);
         return ResponseEntity.ok("Transação recorrente registrada com sucesso.");
     }
+    @PutMapping("/{id}")
+    public ResponseEntity<RecurringTransaction> editar(@PathVariable UUID id,
+        @RequestBody RecurringTransaction rt, @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(recurringTransactionService.editar(id, rt, user.getId()));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(@PathVariable UUID id, @AuthenticationPrincipal User user) {
+        recurringTransactionService.excluir(id, user.getId());
+        return ResponseEntity.noContent().build();
+    }
 }
