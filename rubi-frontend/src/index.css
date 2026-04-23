@@ -1,52 +1,138 @@
-/* src/index.css */
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
-
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* ============================================================
+   RUBI — Design System
+   Dark geometric fintech aesthetic
+   ============================================================ */
 
 :root {
-  /* Paleta Oficial do Rubi */
-  --deep: #605063;
-  --teal: #248f8d;
-  --sage: #61ada0;
-  --mint: #b2d5ba;
-  --cream: #eff3cd;
-  
-  /* Cores de Apoio */
-  --white: #ffffff;
-  --dark: #1a161b;
-  --gray: #8a8590;
-  --danger: #d95b5b;
-  --success: #4caf80;
-  --warn: #e6a817;
-  
-  /* Tipografia */
-  --fd: 'Syne', sans-serif;
-  --fb: 'DM Sans', sans-serif;
+  /* Brand palette */
+  --lime:    #CAF729;
+  --mint:    #79DD7E;
+  --teal:    #2ECBAA;
+  --ocean:   #21B6B6;
+  --violet:  #888DDA;
+
+  /* Dark surface system */
+  --bg-base:    #0B0C10;
+  --bg-raised:  #13151B;
+  --bg-float:   #1A1D26;
+  --bg-overlay: #222530;
+  --bg-hover:   #2A2E3D;
+
+  /* Borders */
+  --border:        rgba(255,255,255,0.07);
+  --border-bright: rgba(255,255,255,0.12);
+  --border-accent: rgba(202,247,41,0.25);
+
+  /* Text */
+  --text-primary:   #F4F5F7;
+  --text-secondary: #8A8FA8;
+  --text-muted:     #4A4E62;
+  --text-inverse:   #0B0C10;
+
+  /* Semantic */
+  --danger:  #F05252;
+  --warning: #F59E0B;
+  --success: var(--mint);
+
+  /* Typography */
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+
+  /* Geometry */
+  --radius-sm: 4px;
+  --radius:    8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Spacing scale */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+  --sp-12: 48px; --sp-16: 64px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow:    0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.6);
+  --shadow-lime: 0 0 24px rgba(202,247,41,0.12);
+  --shadow-teal: 0 0 24px rgba(46,203,170,0.12);
+
+  /* Transitions */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration: 200ms;
 }
+
+/* ---- Reset ---- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root {
   height: 100%;
-  overflow: hidden; /* A REGRA DE ZERO SCROLL */
-  font-family: var(--fb);
-  background-color: var(--cream);
+  overflow: hidden; /* No scroll — entire UI fits viewport */
 }
 
-/* Animações Globais */
-@keyframes fadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes scaleIn { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+}
 
-.fadeUp { animation: fadeUp .4s ease forwards; }
-.scaleIn { animation: scaleIn .3s ease forwards; }
+/* ---- Typography ---- */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
 
-button { cursor: pointer; font-family: var(--fb); border: none; transition: all .18s; }
-input, select { font-family: var(--fb); outline: none; transition: border-color .2s; }
-input:focus, select:focus { border-color: var(--teal) !important; }
+/* ---- Scrollable containers (only inner panels scroll, not the page) ---- */
+.scrollable {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-hover) transparent;
+}
+.scrollable::-webkit-scrollbar { width: 4px; }
+.scrollable::-webkit-scrollbar-track { background: transparent; }
+.scrollable::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 99px;
+}
 
-/* Scrollbar Customizada (Aparece apenas DENTRO das listas, nunca na tela toda) */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-thumb { background: var(--mint); border-radius: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
+/* ---- Utility ---- */
+.sr-only {
+  position: absolute; width:1px; height:1px;
+  padding:0; margin:-1px; overflow:hidden;
+  clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+
+/* ---- Animations ---- */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+@keyframes pulse-ring {
+  0%   { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-up  { animation: fadeUp  0.5s var(--ease) both; }
+.animate-fade-in  { animation: fadeIn  0.4s var(--ease) both; }
+
+/* Stagger helpers */
+.delay-1 { animation-delay: 60ms; }
+.delay-2 { animation-delay: 120ms; }
+.delay-3 { animation-delay: 180ms; }
+.delay-4 { animation-delay: 240ms; }
+.delay-5 { animation-delay: 300ms; }
