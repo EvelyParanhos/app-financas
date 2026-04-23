@@ -45,14 +45,14 @@ public class TransactionService {
      * @param type       Filtra pelo tipo (EXPENSE, INCOME, TRANSFER...). Null = todos.
      * @param categoryId Filtra pela categoria. Null = todas.
      */
-    public List<TransactionItemDTO> listarComFiltros(UUID userId, int month, int year,
-                                                      TransactionType type, UUID categoryId) {
-        // Passa o enum como String para o JPQL lidar corretamente com null
-        String typeStr = type != null ? type.name() : null;
 
+    public List<TransactionItemDTO> listarComFiltros(UUID userId, int month, int year,
+                                                  TransactionType type, UUID categoryId) {
         return transactionRepository
-            .findComFiltros(userId, month, year, typeStr, categoryId)
+            .findComFiltros(userId, month, year)  // sem os parâmetros de filtro
             .stream()
+            .filter(t -> type == null || t.getType() == type)
+            .filter(t -> categoryId == null || (t.getCategory() != null && t.getCategory().getId().equals(categoryId)))
             .map(t -> new TransactionItemDTO(
                 t.getId(),
                 t.getDescription(),

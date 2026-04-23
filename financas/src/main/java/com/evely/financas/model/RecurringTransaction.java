@@ -52,7 +52,7 @@ public class RecurringTransaction {
     @JdbcTypeCode(SqlTypes.VARCHAR)
     private Category category;
 
-    @Column (name = "is_variable")
-    private boolean isVariable;
+    @Column(name = "is_variable")
+    private boolean variable;
 }
 

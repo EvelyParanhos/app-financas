@@ -56,15 +56,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
         AND t.isSimulation = false
         AND MONTH(t.purchaseDate) = :month
         AND YEAR(t.purchaseDate) = :year
-        AND (:typeStr IS NULL OR CAST(t.type AS string) = :typeStr)
-        AND (:categoryId IS NULL OR t.category.id = :categoryId)
         ORDER BY t.purchaseDate DESC
     """)
     List<Transaction> findComFiltros(
         @Param("userId") UUID userId,
         @Param("month") int month,
-        @Param("year") int year,
-        @Param("typeStr") String typeStr,
-        @Param("categoryId") UUID categoryId
+        @Param("year") int year
     );
 }
