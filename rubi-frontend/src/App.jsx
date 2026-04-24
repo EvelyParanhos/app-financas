@@ -76,6 +76,7 @@ export default function App() {
         <Route path="transactions" element={<Transactions />} />
         <Route path="investments"  element={<Investments />} />
         <Route path="simulations"  element={<Simulations />} />
+        <Route path="settings" element={<Settings />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
