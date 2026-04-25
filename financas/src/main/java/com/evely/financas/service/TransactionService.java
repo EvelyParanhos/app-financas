@@ -217,4 +217,18 @@ public class TransactionService {
 
         transactionRepository.delete(transaction);
     }
+
+    public List<TransactionItemDTO> listarSimulacoes(UUID userId, int month, int year) {
+    return transactionRepository.findSimulacoes(userId, month, year)
+        .stream()
+        .map(t -> new TransactionItemDTO(
+            t.getId(),
+            t.getDescription(),
+            t.getCategory() != null ? t.getCategory().getName() : "Sem Categoria",
+            t.getTotalAmount(),
+            t.getPurchaseDate(),
+            t.getType().name()
+        ))
+        .toList();
+}
 }

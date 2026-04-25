@@ -88,4 +88,14 @@ public class TransactionController {
             installmentCount
         );
     }
+
+    @GetMapping("/simulations")
+    public ResponseEntity<List<TransactionItemDTO>> listarSimulacoes(
+            @RequestParam int month,
+            @RequestParam int year,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(
+            transactionService.listarSimulacoes(user.getId(), month, year)
+        );
+    }
 }

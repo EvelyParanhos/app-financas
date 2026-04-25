@@ -63,4 +63,21 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
         @Param("month") int month,
         @Param("year") int year
     );
+
+    @Query("""
+    SELECT t FROM Transaction t
+    LEFT JOIN FETCH t.category
+    LEFT JOIN FETCH t.account
+    WHERE t.account.owner.id = :userId
+    AND t.isSimulation = true
+    AND MONTH(t.purchaseDate) = :month
+    AND YEAR(t.purchaseDate) = :year
+    ORDER BY t.createdAt DESC
+    """)
+    List<Transaction> findSimulacoes(
+        @Param("userId") UUID userId,
+        @Param("month") int month,
+        @Param("year") int year
+    );
+
 }
