@@ -1,16 +1,17 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
-import Landing   from './pages/Landing'
-import Login     from './pages/Login'
-import Register  from './pages/Register'
-import Verify    from './pages/Verify'
-import Onboarding from './pages/Onboarding'
-import AppLayout  from './components/layout/AppLayout'
-import Dashboard  from './pages/Dashboard'
-import Simulations from './pages/Simulations'
-import Investments from './pages/Investments'
+import Landing      from './pages/Landing'
+import Login        from './pages/Login'
+import Register     from './pages/Register'
+import Verify       from './pages/Verify'
+import Onboarding   from './pages/Onboarding'
+import AppLayout    from './components/layout/AppLayout'
+import Dashboard    from './pages/Dashboard'
+import Simulations  from './pages/Simulations'
+import Investments  from './pages/Investments'
 import Transactions from './pages/Transactions'
-import Settings   from './pages/Settings'
+import Loans        from './pages/Loans'
+import Settings     from './pages/Settings'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -32,16 +33,14 @@ function SplashScreen() {
       height: '100vh', display: 'flex', alignItems: 'center',
       justifyContent: 'center', background: 'var(--bg-base)'
     }}>
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16
-      }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
         <RubiLogo size={48} />
         <div style={{
-          width: 32, height: 2, background: 'var(--lime)',
-          animation: 'shimmer 1.2s linear infinite',
+          width: 32, height: 2,
           backgroundImage: 'linear-gradient(90deg, var(--lime) 0%, var(--teal) 50%, var(--lime) 100%)',
           backgroundSize: '200% 100%',
           borderRadius: 99,
+          animation: 'shimmer 1.2s linear infinite',
         }} />
       </div>
     </div>
@@ -61,22 +60,19 @@ export function RubiLogo({ size = 32 }) {
 export default function App() {
   return (
     <Routes>
-      {/* Public */}
-      <Route path="/"        element={<Landing />} />
-      <Route path="/login"   element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path="/register"element={<PublicRoute><Register /></PublicRoute>} />
-      <Route path="/verify"  element={<Verify />} />
-
-      {/* Onboarding */}
+      <Route path="/"         element={<Landing />} />
+      <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+      <Route path="/verify"   element={<Verify />} />
       <Route path="/onboarding" element={<PrivateRoute><Onboarding /></PrivateRoute>} />
 
-      {/* App */}
       <Route path="/" element={<PrivateRoute><AppLayout /></PrivateRoute>}>
         <Route path="dashboard"    element={<Dashboard />} />
         <Route path="transactions" element={<Transactions />} />
         <Route path="investments"  element={<Investments />} />
         <Route path="simulations"  element={<Simulations />} />
-        <Route path="settings" element={<Settings />} />
+        <Route path="loans"        element={<Loans />} />
+        <Route path="settings"     element={<Settings />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

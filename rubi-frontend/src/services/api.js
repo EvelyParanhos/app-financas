@@ -136,9 +136,17 @@ export const partnershipAPI = {
   dissolve: () => api.delete('/partnerships/me'),
 }
 
+// ── Recurring ─────────────────────────────────────────────────────────────
+export const recurringAPI = {
+  list:       () => api.get('/recurring'),
+  create:     (data) => api.post('/recurring', data),
+  edit:       (id, data) => api.put(`/recurring/${id}`, data),
+  delete:     (id) => api.delete(`/recurring/${id}`),
+  materialize:(id, month, year, actualAmount = null) => {
+  }
+}
+
 // ── Audit ─────────────────────────────────────────────────────────────────
 export const auditAPI = {
   list: (page = 0, size = 20) => api.get(`/audit?page=${page}&size=${size}`),
 }
-
-export default api
