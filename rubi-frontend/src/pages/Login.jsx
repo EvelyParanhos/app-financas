@@ -1,4 +1,4 @@
-/* Login.jsx */
+/* Login.jsx — com redirecionamento para onboarding no primeiro acesso */
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
@@ -20,7 +20,17 @@ export default function Login() {
     setError(''); setLoading(true)
     try {
       await login(email, password)
-      navigate('/dashboard')
+
+      // Verifica se o usuário já completou o onboarding
+      // A chave é por e-mail para suportar múltiplos usuários no mesmo browser
+      const onboardingKey = `rubi_onboarding_done_${email.toLowerCase()}`
+      const jaFezOnboarding = localStorage.getItem(onboardingKey)
+
+      if (jaFezOnboarding) {
+        navigate('/dashboard')
+      } else {
+        navigate('/onboarding')
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Credenciais inválidas.')
     } finally {
@@ -32,17 +42,26 @@ export default function Login() {
     <AuthLayout title="Bem-vindo de volta" sub="Entre na sua conta Rubi para continuar.">
       <form onSubmit={handle} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Field label="E-mail" htmlFor="email">
-          <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="seu@email.com" required className="field-input" />
+          <input
+            id="email" type="email" value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="seu@email.com" required
+            className="field-input"
+          />
         </Field>
 
         <Field label="Senha" htmlFor="password">
           <div style={{ position: 'relative' }}>
-            <input id="password" type={showPw ? 'text' : 'password'} value={password}
+            <input
+              id="password" type={showPw ? 'text' : 'password'} value={password}
               onChange={e => setPassword(e.target.value)} placeholder="••••••••"
-              required minLength={8} className="field-input" style={{ paddingRight: 44 }} />
-            <button type="button" onClick={() => setShowPw(v => !v)}
-              style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+              required minLength={8} className="field-input" style={{ paddingRight: 44 }}
+            />
+            <button type="button" onClick={() => setShowPw(v => !v)} style={{
+              position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text-muted)', display: 'flex',
+            }}>
               {showPw ? <EyeOff size={16}/> : <Eye size={16}/>}
             </button>
           </div>
