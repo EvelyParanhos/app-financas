@@ -5,14 +5,18 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
-import com.evely.financas.enums.AccountType;
-import com.evely.financas.model.Account;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import com.evely.financas.model.Installment;
 import com.evely.financas.model.RecurringTransaction;
 import com.evely.financas.model.User;
-import com.evely.financas.repository.AccountRepository;
-import com.evely.financas.repository.RecurringTransactionRepository;
-import com.evely.financas.service.AccountService;
 import com.evely.financas.service.RecurringTransactionService;
 import lombok.RequiredArgsConstructor;
 
@@ -21,38 +25,18 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RecurringTransactionController {
 
-    private final RecurringTransactionRepository recurringRepository;
-    private final AccountRepository accountRepository;
-    private final AccountService accountService;
     private final RecurringTransactionService recurringTransactionService;
 
     @PostMapping
     public ResponseEntity<RecurringTransaction> criar(
             @RequestBody RecurringTransaction rt,
             @AuthenticationPrincipal User user) {
-
-        if (rt.getAccount() == null || rt.getAccount().getId() == null) {
-            // Sem conta informada: usa a carteira CASH do próprio usuário
-            Account carteira = accountRepository
-                .findByOwnerId(user.getId())
-                .stream()
-                .filter(a -> a.getType() == AccountType.CASH)
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Carteira não encontrada"));
-            rt.setAccount(carteira);
-        } else {
-            // ✅ ITEM 5: valida acesso — aceita conta própria OU conta compartilhada do parceiro
-            Account conta = accountService
-                .buscarContaComAcessoPermitido(rt.getAccount().getId(), user.getId());
-            rt.setAccount(conta);
-        }
-
-        return ResponseEntity.status(201).body(recurringRepository.save(rt));
+        return ResponseEntity.status(201).body(recurringTransactionService.criar(rt, user));
     }
 
     @GetMapping
     public ResponseEntity<List<RecurringTransaction>> listar(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(recurringRepository.findByAccountOwnerId(user.getId()));
+        return ResponseEntity.ok(recurringTransactionService.listar(user.getId()));
     }
 
     @PostMapping("/{id}/materialize")
@@ -63,11 +47,26 @@ public class RecurringTransactionController {
             @RequestParam(required = false) BigDecimal actualAmount,
             @AuthenticationPrincipal User user) {
         recurringTransactionService.materializarParaMes(id, month, year, user.getId(), actualAmount);
-        return ResponseEntity.ok("Transação recorrente registrada com sucesso.");
+        return ResponseEntity.ok("Transacao recorrente registrada com sucesso.");
     }
+
+    @PostMapping("/{id}/confirm")
+    public ResponseEntity<Installment> confirmar(
+            @PathVariable UUID id,
+            @RequestParam int month,
+            @RequestParam int year,
+            @RequestParam(required = false) BigDecimal actualAmount,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(
+            recurringTransactionService.confirmarParaMes(id, month, year, user.getId(), actualAmount)
+        );
+    }
+
     @PutMapping("/{id}")
-    public ResponseEntity<RecurringTransaction> editar(@PathVariable UUID id,
-        @RequestBody RecurringTransaction rt, @AuthenticationPrincipal User user) {
+    public ResponseEntity<RecurringTransaction> editar(
+            @PathVariable UUID id,
+            @RequestBody RecurringTransaction rt,
+            @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(recurringTransactionService.editar(id, rt, user.getId()));
     }
 

@@ -88,6 +88,32 @@ public class TransactionService {
             throw new RuntimeException("Transferência exige uma conta de destino.");
         }
 
+        if (transacao.getType() == TransactionType.EXPENSE
+                && conta.getType() == AccountType.INVESTMENT) {
+            throw new RuntimeException("Gastos nao podem sair diretamente de uma conta de investimento.");
+        }
+
+        if (transacao.getType() == TransactionType.INCOME
+                && conta.getType() != AccountType.CASH
+                && conta.getType() != AccountType.CHECKING) {
+            throw new RuntimeException("Entradas devem cair em carteira ou conta corrente.");
+        }
+
+        if (transacao.getType() == TransactionType.TRANSFER) {
+            Account destino = accountRepository.findById(transacao.getDestinationAccount().getId())
+                .orElseThrow(() -> new ObjectNotFoundException("Conta de destino nao encontrada"));
+
+            if (conta.getId().equals(destino.getId())) {
+                throw new RuntimeException("Origem e destino devem ser contas diferentes.");
+            }
+            if (!isContaDeCaixa(conta) || !isContaDeCaixa(destino)) {
+                throw new RuntimeException(
+                    "Transferencias internas so podem ocorrer entre carteira e conta corrente.");
+            }
+
+            transacao.setDestinationAccount(destino);
+        }
+
         BigDecimal valorParcela = transacao.getTotalAmount()
             .divide(BigDecimal.valueOf(totalParcelas), 2, RoundingMode.HALF_UP);
 
@@ -216,6 +242,10 @@ public class TransactionService {
         }
 
         transactionRepository.delete(transaction);
+    }
+
+    private boolean isContaDeCaixa(Account conta) {
+        return conta.getType() == AccountType.CASH || conta.getType() == AccountType.CHECKING;
     }
 
     public List<TransactionItemDTO> listarSimulacoes(UUID userId, int month, int year) {

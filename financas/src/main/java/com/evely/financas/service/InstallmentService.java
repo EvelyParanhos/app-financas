@@ -31,9 +31,13 @@ public class InstallmentService {
     private final AuditService auditService;
 
     @Transactional
-    public Installment pagarParcela(UUID id) {
+    public Installment pagarParcela(UUID id, UUID userId) {
         Installment parcela = installmentRepository.findById(id)
             .orElseThrow(() -> new ObjectNotFoundException("Parcela não encontrada!"));
+
+        if (parcela.getPayer() == null || !parcela.getPayer().getId().equals(userId)) {
+            throw new RuntimeException("Sem permissao para pagar esta parcela.");
+        }
 
         if (parcela.getStatus() == InstallmentStatus.PAID) {
             throw new RuntimeException("Esta parcela já foi paga.");

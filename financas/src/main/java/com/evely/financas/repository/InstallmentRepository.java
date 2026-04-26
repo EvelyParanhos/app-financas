@@ -32,6 +32,22 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
     );
 
     @Query("""
+        SELECT i FROM Installment i
+        JOIN FETCH i.transaction t
+        LEFT JOIN FETCH t.category
+        LEFT JOIN FETCH i.payer
+        WHERE i.payer.id = :userId
+        AND i.dueDate BETWEEN :inicio AND :fim
+        AND i.invoice IS NULL
+        ORDER BY i.dueDate ASC
+    """)
+    List<Installment> findChecklistWithDetailsByUserAndPeriod(
+        @Param("userId") UUID userId,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim
+    );
+
+    @Query("""
         SELECT MONTH(i.dueDate), YEAR(i.dueDate),
                SUM(CASE WHEN t.isSimulation = false THEN i.amount ELSE 0 END),
                SUM(CASE WHEN t.isSimulation = true  THEN i.amount ELSE 0 END)
@@ -40,6 +56,7 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
         WHERE i.payer.id = :userId
         AND i.status = 'PENDING'
         AND i.dueDate BETWEEN :inicio AND :fim
+        AND i.invoice IS NULL
         AND t.type NOT IN ('INCOME', 'TRANSFER', 'INTERNAL_REPAYMENT')
         GROUP BY MONTH(i.dueDate), YEAR(i.dueDate)
         ORDER BY YEAR(i.dueDate), MONTH(i.dueDate)
@@ -86,6 +103,7 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
         WHERE i.payer.id = :userId
         AND i.status = 'PENDING'
         AND i.dueDate BETWEEN :inicio AND :fim
+        AND i.invoice IS NULL
         AND (:incluirSimulacoes = true OR t.isSimulation = false)
         AND t.type NOT IN ('INCOME', 'TRANSFER', 'INTERNAL_REPAYMENT')
     """)
@@ -125,6 +143,7 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
         WHERE i.payer.id = :userId
         AND i.status = 'PENDING'
         AND i.dueDate BETWEEN :inicio AND :fim
+        AND i.invoice IS NULL
         AND t.isSimulation = false
         AND t.account.shared = true
         AND t.type NOT IN ('INCOME', 'TRANSFER', 'INTERNAL_REPAYMENT')
@@ -153,6 +172,23 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
     );
 
     @Query("""
+        SELECT i FROM Installment i
+        JOIN FETCH i.transaction t
+        LEFT JOIN FETCH t.category
+        LEFT JOIN FETCH i.payer
+        WHERE i.payer.id = :partnerId
+        AND t.account.shared = true
+        AND i.dueDate BETWEEN :inicio AND :fim
+        AND i.invoice IS NULL
+        ORDER BY i.dueDate ASC
+    """)
+    List<Installment> findChecklistSharedByPartnerAndPeriod(
+        @Param("partnerId") UUID partnerId,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim
+    );
+
+    @Query("""
         SELECT COUNT(i) > 0 FROM Installment i
         WHERE i.transaction.id = :transactionId
         AND i.status = 'PAID'
@@ -163,4 +199,12 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
     @jakarta.transaction.Transactional
     @Query("DELETE FROM Installment i WHERE i.transaction.id IN (SELECT t.id FROM Transaction t WHERE t.isSimulation = true AND t.createdAt < :dia)")
     Long deleteByIsSimulationTrueAndCreatedAtBefore(@Param("dia") java.time.LocalDateTime dia);
+
+    @Modifying
+    @jakarta.transaction.Transactional
+    @Query("UPDATE Installment i SET i.status = :status WHERE i.invoice.id = :invoiceId")
+    int markInvoiceInstallmentsAsStatus(
+        @Param("invoiceId") UUID invoiceId,
+        @Param("status") InstallmentStatus status
+    );
 }

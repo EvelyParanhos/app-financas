@@ -1,22 +1,110 @@
-import { useState } from 'react'
-import { X, Check, Repeat } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { X, Check, Repeat, CreditCard, Wallet } from 'lucide-react'
+import { accountsAPI } from '../../services/api'
 import { Button, FormError } from '../ui/FormElements'
 import CurrencyInput from '../ui/CurrencyInput'
 
+const ACCOUNT_LABEL = {
+  CASH: 'Carteira',
+  CHECKING: 'Corrente',
+}
+
+function kindOf(item) {
+  if (item?.checklistType) return item.checklistType
+  if (item?.invoiceId) return 'INVOICE'
+  if (item?.recurringTransactionId) return 'RECURRING'
+  return 'INSTALLMENT'
+}
+
 export default function PayInstallmentModal({ item, onClose, onConfirm }) {
+  const kind = kindOf(item)
   const [amount, setAmount] = useState(Number(item?.amount || 0))
+  const [accounts, setAccounts] = useState([])
+  const [sourceAccountId, setSourceAccountId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const sourceAccounts = useMemo(
+    () => accounts.filter(a => a.type === 'CASH' || a.type === 'CHECKING'),
+    [accounts]
+  )
+
+  useEffect(() => {
+    setAmount(Number(item?.amount || 0))
+    setError('')
+  }, [item])
+
+  useEffect(() => {
+    if (kind !== 'INVOICE') return
+
+    const load = async () => {
+      try {
+        const { data } = await accountsAPI.list(true)
+        setAccounts(data || [])
+      } catch {
+        setAccounts([])
+      }
+    }
+    load()
+  }, [kind])
+
+  useEffect(() => {
+    if (!sourceAccountId && sourceAccounts.length) {
+      setSourceAccountId(sourceAccounts[0].id)
+    }
+  }, [sourceAccounts, sourceAccountId])
+
+  const copy = {
+    INVOICE: {
+      title: 'Pagar fatura',
+      subtitle: 'Cartao de credito',
+      icon: <CreditCard size={15} />,
+      amountLabel: 'Valor a pagar',
+      hint: 'O pagamento reduz o saldo da conta escolhida.',
+    },
+    RECURRING: {
+      title: item?.transactionType === 'INCOME' ? 'Confirmar entrada' : 'Confirmar pagamento',
+      subtitle: 'Transacao recorrente',
+      icon: <Repeat size={15} />,
+      amountLabel: 'Valor real',
+      hint: 'Ao confirmar, a recorrencia entra no mes e fica concluida.',
+    },
+    INSTALLMENT: {
+      title: 'Confirmar pagamento',
+      subtitle: 'Parcela do mes',
+      icon: <Wallet size={15} />,
+      amountLabel: 'Valor',
+      hint: 'Ao confirmar, o saldo real sera atualizado.',
+    },
+  }[kind]
+
   const handle = async () => {
-    if (amount <= 0) return setError('Informe um valor.')
-    setError(''); setLoading(true)
+    if (amount <= 0) return setError('Informe um valor maior que zero.')
+    if (kind === 'INVOICE' && !sourceAccountId) {
+      return setError('Selecione a conta de pagamento.')
+    }
+
+    setError('')
+    setLoading(true)
     try {
-      await onConfirm(item, amount)
+      await onConfirm(item, { amount, sourceAccountId })
     } catch (err) {
-      setError(err.response?.data?.message || 'Erro ao registrar.')
+      setError(err.response?.data?.message || 'Erro ao confirmar.')
       setLoading(false)
     }
+  }
+
+  const selectStyle = {
+    width: '100%',
+    padding: '12px 14px',
+    background: 'var(--bg-float)',
+    border: '1.5px solid var(--border)',
+    borderRadius: 8,
+    color: 'var(--text-primary)',
+    fontFamily: 'var(--font-body)',
+    fontSize: 13,
+    outline: 'none',
+    cursor: 'pointer',
   }
 
   return (
@@ -29,12 +117,11 @@ export default function PayInstallmentModal({ item, onClose, onConfirm }) {
       <div style={{
         position: 'fixed', top: '50%', left: '50%',
         transform: 'translate(-50%, -50%)',
-        width: '100%', maxWidth: 380,
+        width: 'min(420px, calc(100vw - 32px))',
         background: 'var(--bg-raised)', border: '1px solid var(--border)',
-        borderRadius: 16, overflow: 'hidden', zIndex: 103,
-        animation: 'fadeUp 0.2s var(--ease) both',
+        borderRadius: 12, overflow: 'hidden', zIndex: 103,
+        animation: 'modalEnter 0.2s var(--ease) both',
       }}>
-        {/* Header */}
         <div style={{
           padding: '16px 18px', borderBottom: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -46,14 +133,14 @@ export default function PayInstallmentModal({ item, onClose, onConfirm }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: 'var(--teal)',
             }}>
-              <Repeat size={15} />
+              {copy.icon}
             </div>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14 }}>
-                Confirmar pagamento
+                {copy.title}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                Transação recorrente
+                {copy.subtitle}
               </div>
             </div>
           </div>
@@ -67,45 +154,76 @@ export default function PayInstallmentModal({ item, onClose, onConfirm }) {
           </button>
         </div>
 
-        {/* Body */}
-        <div style={{ padding: '20px' }}>
-          {/* Item name */}
+        <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{
-            padding: '12px 14px', borderRadius: 10,
+            padding: '12px 14px', borderRadius: 8,
             background: 'var(--bg-float)', border: '1px solid var(--border)',
-            marginBottom: 20,
           }}>
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 3 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>
               {item?.transactionDescription}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {item?.categoryName} {item?.dueDate
-                ? `• ${new Date(item.dueDate + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`
+              {item?.categoryName}
+              {item?.dueDate
+                ? ` - ${new Date(item.dueDate + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`
                 : ''}
             </div>
           </div>
 
-          {/* Amount with PIX style */}
-          <CurrencyInput
-            value={amount}
-            onChange={setAmount}
-            label="Valor real"
-            id="pay-amount"
-            large
-          />
+          {kind === 'INSTALLMENT' ? (
+            <div style={{
+              padding: '12px 14px', borderRadius: 8,
+              background: 'rgba(202,247,41,0.06)', border: '1px solid var(--border-accent)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{copy.amountLabel}</span>
+              <strong style={{ fontFamily: 'var(--font-body)', fontSize: 15 }}>
+                R$ {Number(item?.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </strong>
+            </div>
+          ) : (
+            <CurrencyInput
+              value={amount}
+              onChange={setAmount}
+              label={copy.amountLabel}
+              id="checklist-amount"
+              large
+            />
+          )}
 
-          {/* Hint */}
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, textAlign: 'center' }}>
-            Valor estimado: R$ {Number(item?.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            {' '}— ajuste se necessário
+          {kind === 'INVOICE' && (
+            <div>
+              <label htmlFor="invoice-source-account" style={{
+                display: 'block', fontSize: 11, color: 'var(--text-secondary)',
+                fontWeight: 700, textTransform: 'uppercase', marginBottom: 6,
+              }}>
+                Pagar com
+              </label>
+              <select
+                id="invoice-source-account"
+                value={sourceAccountId}
+                onChange={e => setSourceAccountId(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">Selecionar conta...</option>
+                {sourceAccounts.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} ({ACCOUNT_LABEL[a.type] || a.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+            {copy.hint}
           </div>
 
-          {error && <FormError style={{ marginTop: 12 }}>{error}</FormError>}
+          {error && <FormError>{error}</FormError>}
         </div>
 
-        {/* Footer */}
         <div style={{
-          padding: '12px 20px', borderTop: '1px solid var(--border)',
+          padding: '12px 18px', borderTop: '1px solid var(--border)',
           display: 'flex', gap: 10,
         }}>
           <button onClick={onClose} style={{

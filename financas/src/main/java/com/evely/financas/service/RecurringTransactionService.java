@@ -10,9 +10,14 @@ import org.springframework.stereotype.Service;
 import com.evely.financas.dto.InvestmentEntryDTO;
 import com.evely.financas.enums.AccountType;
 import com.evely.financas.enums.InvestmentEntryType;
+import com.evely.financas.enums.TransactionType;
 import com.evely.financas.exception.ObjectNotFoundException;
+import com.evely.financas.model.Account;
+import com.evely.financas.model.Installment;
 import com.evely.financas.model.RecurringTransaction;
 import com.evely.financas.model.Transaction;
+import com.evely.financas.model.User;
+import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.RecurringTransactionRepository;
 import com.evely.financas.repository.TransactionRepository;
 import jakarta.transaction.Transactional;
@@ -29,18 +34,46 @@ public class RecurringTransactionService {
     private final TransactionService transactionService;
     private final CreditCardInvoiceService invoiceService;
     private final InvestmentService investmentService;
+    private final InstallmentService installmentService;
+    private final AccountRepository accountRepository;
+    private final AccountService accountService;
 
     // ─────────────────────────────────────────────────────────────────────────
     // CRUD
     // ─────────────────────────────────────────────────────────────────────────
 
     @Transactional
+    public RecurringTransaction criar(RecurringTransaction rt, User user) {
+        validarDadosBasicos(rt);
+        rt.setUser(user);
+
+        if (rt.getAccount() == null || rt.getAccount().getId() == null) {
+            Account carteira = accountRepository
+                .findByOwnerId(user.getId())
+                .stream()
+                .filter(a -> a.getType() == AccountType.CASH)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Carteira nao encontrada"));
+            rt.setAccount(carteira);
+        } else {
+            Account conta = accountService
+                .buscarContaComAcessoPermitido(rt.getAccount().getId(), user.getId());
+            validarContaParaRecorrencia(rt.getType(), conta);
+            rt.setAccount(conta);
+        }
+
+        return recurringRepository.save(rt);
+    }
+
+    public List<RecurringTransaction> listar(UUID userId) {
+        return recurringRepository.findByUserId(userId);
+    }
+
+    @Transactional
     public void excluir(UUID id, UUID userId) {
         RecurringTransaction rt = recurringRepository.findById(id)
             .orElseThrow(() -> new ObjectNotFoundException("Transação recorrente não encontrada"));
-        if (!rt.getAccount().getOwner().getId().equals(userId)) {
-            throw new RuntimeException("Sem permissão para excluir esta transação recorrente.");
-        }
+        validarDono(rt, userId);
         recurringRepository.delete(rt);
     }
 
@@ -48,9 +81,8 @@ public class RecurringTransactionService {
     public RecurringTransaction editar(UUID id, RecurringTransaction dados, UUID userId) {
         RecurringTransaction rt = recurringRepository.findById(id)
             .orElseThrow(() -> new ObjectNotFoundException("Transação recorrente não encontrada"));
-        if (!rt.getAccount().getOwner().getId().equals(userId)) {
-            throw new RuntimeException("Sem permissão para editar esta transação recorrente.");
-        }
+        validarDono(rt, userId);
+        validarDadosBasicos(dados);
         rt.setDescription(dados.getDescription());
         rt.setEstimatedAmount(dados.getEstimatedAmount());
         rt.setDayOfMonth(dados.getDayOfMonth());
@@ -70,20 +102,7 @@ public class RecurringTransactionService {
         int diaDeHoje = LocalDate.now().getDayOfMonth();
         List<RecurringTransaction> moldes = recurringRepository.findByDayOfMonth(diaDeHoje);
 
-        for (RecurringTransaction molde : moldes) {
-            try {
-                // Contas de INVESTIMENTO não são materializadas pelo scheduler —
-                // devem ser confirmadas manualmente pelo usuário via /materialize
-                if (molde.getAccount().getType() == AccountType.INVESTMENT) continue;
-
-                if (!jaMaterializadaNoPeriodo(molde, LocalDate.now(), LocalDate.now())) {
-                    materializarMolde(molde, LocalDate.now(), null);
-                }
-            } catch (Exception e) {
-                log.error("Erro ao processar recorrente '{}': {}", molde.getDescription(), e.getMessage());
-            }
-        }
-        log.info("Recorrentes processados: {} itens do dia.", moldes.size());
+        log.info("Recorrentes aguardando validacao manual hoje: {} itens.", moldes.size());
     }
 
     @Scheduled(cron = "0 0 0 * * ?")
@@ -111,14 +130,12 @@ public class RecurringTransactionService {
      *   - Se omitido em variável: registra com o valor estimado.
      */
     @Transactional
-    public void materializarParaMes(UUID recurringId, int month, int year,
-                                    UUID userId, BigDecimal actualAmount) {
+    public Transaction materializarParaMes(UUID recurringId, int month, int year,
+                                           UUID userId, BigDecimal actualAmount) {
         RecurringTransaction molde = recurringRepository.findById(recurringId)
             .orElseThrow(() -> new ObjectNotFoundException("Transação recorrente não encontrada"));
 
-        if (!molde.getAccount().getOwner().getId().equals(userId)) {
-            throw new RuntimeException("Sem permissão para materializar esta transação.");
-        }
+        validarDono(molde, userId);
 
         LocalDate inicioMes = LocalDate.of(year, month, 1);
         LocalDate fimMes = inicioMes.withDayOfMonth(inicioMes.lengthOfMonth());
@@ -136,14 +153,26 @@ public class RecurringTransactionService {
         }
 
         int diaDoMes = Math.min(molde.getDayOfMonth(), YearMonth.of(year, month).lengthOfMonth());
-        materializarMolde(molde, LocalDate.of(year, month, diaDoMes), actualAmount);
+        return materializarMolde(molde, LocalDate.of(year, month, diaDoMes), actualAmount);
+    }
+
+    @Transactional
+    public Installment confirmarParaMes(UUID recurringId, int month, int year,
+                                        UUID userId, BigDecimal actualAmount) {
+        Transaction transacao = materializarParaMes(recurringId, month, year, userId, actualAmount);
+        if (transacao == null || transacao.getInstallments().isEmpty()) {
+            return null;
+        }
+
+        Installment parcela = transacao.getInstallments().get(0);
+        return installmentService.pagarParcela(parcela.getId(), userId);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // PRIVADO
     // ─────────────────────────────────────────────────────────────────────────
 
-    private void materializarMolde(RecurringTransaction molde, LocalDate data, BigDecimal actualAmount) {
+    private Transaction materializarMolde(RecurringTransaction molde, LocalDate data, BigDecimal actualAmount) {
         BigDecimal valor = resolverValor(molde, actualAmount);
 
         // ✅ Conta de INVESTIMENTO → cria InvestmentEntry DEPOSIT diretamente.
@@ -158,8 +187,9 @@ public class RecurringTransactionService {
                 data,
                 "[RECORRENTE] " + molde.getDescription()
             );
-            investmentService.lancarEntrada(dto, molde.getAccount().getOwner().getId());
-            return;
+            investmentService.lancarEntrada(dto,
+                molde.getUser() != null ? molde.getUser().getId() : molde.getAccount().getOwner().getId());
+            return null;
         }
 
         // Para demais contas: Transaction + Installment PENDING no checklist
@@ -172,8 +202,41 @@ public class RecurringTransactionService {
         novaTransacao.setPurchaseDate(data);
         novaTransacao.setSimulation(false);
 
-        transactionService.registrarTransacao(novaTransacao, 1,
-            molde.getAccount().getOwner().getId());
+        return transactionService.registrarTransacao(novaTransacao, 1,
+            molde.getUser() != null ? molde.getUser().getId() : molde.getAccount().getOwner().getId());
+    }
+
+    private void validarDono(RecurringTransaction rt, UUID userId) {
+        if (rt.getUser() != null && rt.getUser().getId().equals(userId)) {
+            return;
+        }
+        if (rt.getUser() == null && rt.getAccount().getOwner().getId().equals(userId)) {
+            return;
+        }
+        throw new RuntimeException("Sem permissao para gerenciar esta transacao recorrente.");
+    }
+
+    private void validarDadosBasicos(RecurringTransaction rt) {
+        if (rt.getDescription() == null || rt.getDescription().isBlank()) {
+            throw new RuntimeException("Informe uma descricao.");
+        }
+        if (rt.getEstimatedAmount() == null || rt.getEstimatedAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Informe um valor estimado maior que zero.");
+        }
+        if (rt.getDayOfMonth() < 1 || rt.getDayOfMonth() > 31) {
+            throw new RuntimeException("O dia do mes deve ficar entre 1 e 31.");
+        }
+        if (rt.getType() != TransactionType.EXPENSE && rt.getType() != TransactionType.INCOME) {
+            throw new RuntimeException("Recorrencias aceitam apenas entradas ou gastos.");
+        }
+    }
+
+    private void validarContaParaRecorrencia(TransactionType tipo, Account conta) {
+        if (tipo == TransactionType.INCOME
+                && conta.getType() != AccountType.CASH
+                && conta.getType() != AccountType.CHECKING) {
+            throw new RuntimeException("Entradas recorrentes devem cair em carteira ou conta corrente.");
+        }
     }
 
     private BigDecimal resolverValor(RecurringTransaction molde, BigDecimal actualAmount) {

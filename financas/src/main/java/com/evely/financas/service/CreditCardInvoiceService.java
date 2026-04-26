@@ -9,12 +9,14 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.evely.financas.enums.AccountType;
+import com.evely.financas.enums.InstallmentStatus;
 import com.evely.financas.enums.InvoiceStatus;
 import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Account;
 import com.evely.financas.model.CreditCardInvoice;
 import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.CreditCardInvoiceRepository;
+import com.evely.financas.repository.InstallmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -27,6 +29,8 @@ public class CreditCardInvoiceService {
     private final AccountRepository accountRepository;
     private final BalanceService balanceService;
     private final AuditService auditService;
+    private final AccountService accountService;
+    private final InstallmentRepository installmentRepository;
 
     public LocalDate resolverMesDaPrimeiraParcela(Account account, LocalDate purchaseDate) {
         int closingDay = account.getClosingDay();
@@ -88,18 +92,26 @@ public class CreditCardInvoiceService {
         CreditCardInvoice invoice = invoiceRepository.findById(invoiceId)
             .orElseThrow(() -> new ObjectNotFoundException("Fatura não encontrada"));
 
+        accountService.buscarContaComAcessoPermitido(invoice.getAccount().getId(), userId);
+
         if (invoice.getStatus() == InvoiceStatus.PAID) {
             throw new RuntimeException("Esta fatura já foi paga integralmente.");
         }
 
-        BigDecimal novoPagoTotal = invoice.getPaidAmount().add(valorPago);
+        if (valorPago == null || valorPago.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("O valor pago deve ser maior que zero.");
+        }
+
+        BigDecimal pagoAtual = invoice.getPaidAmount() != null
+            ? invoice.getPaidAmount()
+            : BigDecimal.ZERO;
+        BigDecimal novoPagoTotal = pagoAtual.add(valorPago);
         if (novoPagoTotal.compareTo(invoice.getTotalAmount()) > 0) {
             throw new RuntimeException("Valor informado ultrapassa o total da fatura.");
         }
 
         // ✅ Debita a conta corrente usada para pagar a fatura (RN02)
-        Account sourceAccount = accountRepository.findById(sourceAccountId)
-            .orElseThrow(() -> new ObjectNotFoundException("Conta de pagamento não encontrada"));
+        Account sourceAccount = accountService.buscarContaComAcessoPermitido(sourceAccountId, userId);
 
         if (sourceAccount.getType() == AccountType.CREDIT_CARD
                 || sourceAccount.getType() == AccountType.INVESTMENT) {
@@ -113,6 +125,8 @@ public class CreditCardInvoiceService {
         if (novoPagoTotal.compareTo(invoice.getTotalAmount()) == 0) {
             invoice.setStatus(InvoiceStatus.PAID);
             invoice.setPaidAt(LocalDateTime.now());
+            installmentRepository.markInvoiceInstallmentsAsStatus(
+                invoice.getId(), InstallmentStatus.PAID);
         } else {
             invoice.setStatus(InvoiceStatus.PARTIALLY_PAID);
         }

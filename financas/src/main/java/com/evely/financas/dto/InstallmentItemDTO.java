@@ -27,4 +27,7 @@ public class InstallmentItemDTO {
      * Permite que o frontend distinga "a pagar" de "a receber" no checklist.
      */
     private String transactionType;
+    private String checklistType;
+    private UUID invoiceId;
+    private String accountName;
 }

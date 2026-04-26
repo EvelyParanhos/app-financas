@@ -12,4 +12,6 @@ public interface RecurringTransactionRepository extends JpaRepository <Recurring
     List<RecurringTransaction> findByDayOfMonth(int dayOfMonth);
 
     List<RecurringTransaction> findByAccountOwnerId(UUID userId);
+
+    List<RecurringTransaction> findByUserId(UUID userId);
 }

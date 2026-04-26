@@ -21,7 +21,7 @@ public class InstallmentController {
     public ResponseEntity<Installment> marcarComoPaga(
             @PathVariable UUID id,
             @AuthenticationPrincipal User user) {
-        Installment paga = installmentService.pagarParcela(id);
+        Installment paga = installmentService.pagarParcela(id, user.getId());
         return ResponseEntity.ok(paga);
     }
 

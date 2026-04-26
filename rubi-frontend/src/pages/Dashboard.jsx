@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   ChevronLeft, ChevronRight, Check, CreditCard, TrendingUp,
   Wallet, Plus, ArrowDownLeft, ArrowUpRight, Repeat,
-  PiggyBank, HandCoins, X, Info,
+  PiggyBank, HandCoins, X, Info, Users, UserRound,
 } from 'lucide-react'
-import { dashboardAPI, installmentsAPI, recurringAPI } from '../services/api'
+import { dashboardAPI, installmentsAPI, recurringAPI, invoicesAPI } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { Button, Badge } from '../components/ui/FormElements'
 import NewTransactionModal from '../components/dashboard/NewTransactionModal'
@@ -61,23 +61,22 @@ export default function Dashboard() {
   const isCurrent = month === now.getMonth() + 1 && year === now.getFullYear()
 
   // ── Checklist handlers ──────────────────────────────────────────────
-  const handleCheck = async (item) => {
-    if (item.recurringTransactionId) {
-      // Item virtual (recorrente não materializado) → abre modal de confirmação
-      setPayTarget(item)
-    } else if (item.installmentId) {
-      // Parcela real → pagar direto
-      try {
-        await installmentsAPI.pay(item.installmentId)
-        load()
-      } catch (err) {
-        alert(err.response?.data?.message || 'Erro ao pagar parcela')
-      }
-    }
+  const handleCheck = (item) => {
+    setPayTarget(item)
   }
 
-  const handleMaterialize = async (item, amount) => {
-    await recurringAPI.materialize(item.recurringTransactionId, month, year, amount)
+  const handleChecklistConfirm = async (item, payload) => {
+    const kind = item.checklistType
+      || (item.invoiceId ? 'INVOICE' : item.recurringTransactionId ? 'RECURRING' : 'INSTALLMENT')
+
+    if (kind === 'RECURRING') {
+      await recurringAPI.confirm(item.recurringTransactionId, month, year, payload.amount)
+    } else if (kind === 'INVOICE') {
+      await invoicesAPI.pay(item.invoiceId, payload.amount, payload.sourceAccountId)
+    } else if (item.installmentId) {
+      await installmentsAPI.pay(item.installmentId)
+    }
+
     setPayTarget(null)
     load()
   }
@@ -120,8 +119,10 @@ export default function Dashboard() {
               background: showCouple ? 'rgba(46,203,170,0.1)' : 'var(--bg-raised)',
               color: showCouple ? 'var(--teal)' : 'var(--text-secondary)',
               fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-body)',
+              display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              {showCouple ? '👫 Casal' : '👤 Só eu'}
+              {showCouple ? <Users size={12} /> : <UserRound size={12} />}
+              {showCouple ? 'Casal' : 'So eu'}
             </button>
           )}
           <Button size="sm" onClick={() => setShowNewTx(true)} icon={<Plus size={13}/>}>
@@ -295,7 +296,7 @@ export default function Dashboard() {
 
               {pending.map((item, i) => (
                 <CheckItem
-                  key={item.installmentId || `v-${item.recurringTransactionId || i}`}
+                  key={item.installmentId || item.invoiceId || `v-${item.recurringTransactionId || i}`}
                   item={item} isPaid={false} onCheck={() => handleCheck(item)}
                 />
               ))}
@@ -310,7 +311,7 @@ export default function Dashboard() {
                   </div>
                   {paid.map((item, i) => (
                     <CheckItem
-                      key={item.installmentId || `p-${i}`}
+                      key={item.installmentId || item.invoiceId || `p-${item.recurringTransactionId || i}`}
                       item={item} isPaid={true}
                     />
                   ))}
@@ -408,7 +409,7 @@ export default function Dashboard() {
         <PayInstallmentModal
           item={payTarget}
           onClose={() => setPayTarget(null)}
-          onConfirm={handleMaterialize}
+          onConfirm={handleChecklistConfirm}
         />
       )}
     </div>
@@ -463,7 +464,10 @@ function SCard({ label, value, icon, color, sub, onClick, active, noBorderRight 
 function CheckItem({ item, isPaid, onCheck }) {
   const isExpense = item.transactionType === 'EXPENSE' || !item.transactionType
   const isVirtual = !!item.recurringTransactionId
-  const typeIcon  = isVirtual
+  const isInvoice = item.checklistType === 'INVOICE' || !!item.invoiceId
+  const typeIcon  = isInvoice
+    ? <CreditCard size={11} color="var(--violet)" />
+    : isVirtual
     ? <Repeat size={11} color="var(--teal)" />
     : isExpense
       ? <ArrowUpRight size={11} color="var(--danger)" />
@@ -481,7 +485,7 @@ function CheckItem({ item, isPaid, onCheck }) {
           onClick={onCheck}
           style={{
             width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-            border: `1.5px solid ${isVirtual ? 'var(--teal)' : item.isSimulation ? 'var(--violet)' : 'var(--border-bright)'}`,
+            border: `1.5px solid ${isInvoice ? 'var(--violet)' : isVirtual ? 'var(--teal)' : item.isSimulation ? 'var(--violet)' : 'var(--border-bright)'}`,
             background: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             transition: 'all 0.15s',
@@ -492,7 +496,7 @@ function CheckItem({ item, isPaid, onCheck }) {
           }}
           onMouseLeave={e => {
             e.currentTarget.style.background = 'none'
-            e.currentTarget.style.borderColor = isVirtual ? 'var(--teal)' : item.isSimulation ? 'var(--violet)' : 'var(--border-bright)'
+            e.currentTarget.style.borderColor = isInvoice ? 'var(--violet)' : isVirtual ? 'var(--teal)' : item.isSimulation ? 'var(--violet)' : 'var(--border-bright)'
           }}
         />
       ) : (
@@ -526,6 +530,7 @@ function CheckItem({ item, isPaid, onCheck }) {
           </span>
           {item.isSimulation && <Badge color="violet">sim</Badge>}
           {isVirtual && !isPaid && <Badge color="muted">fixo</Badge>}
+          {isInvoice && !isPaid && <Badge color="violet">fatura</Badge>}
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
           {item.categoryName}

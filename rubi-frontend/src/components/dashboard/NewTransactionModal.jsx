@@ -193,13 +193,13 @@ export default function NewTransactionModal({ onClose, onSaved, month, year }) {
       <div style={{
         position: 'fixed', top: '50%', left: '50%',
         transform: 'translate(-50%, -50%)',
-        width: '100%', maxWidth: 500,
+        width: 'min(500px, calc(100vw - 32px))',
         background: 'var(--bg-raised)',
         border: '1px solid var(--border)',
         borderRadius: 16, overflow: 'hidden',
         zIndex: 101,
-        animation: 'fadeUp 0.25s var(--ease) both',
-        maxHeight: '92vh', display: 'flex', flexDirection: 'column',
+        animation: 'modalEnter 0.25s var(--ease) both',
+        maxHeight: 'calc(100vh - 32px)', display: 'flex', flexDirection: 'column',
       }}>
         {/* Header */}
         <div style={{

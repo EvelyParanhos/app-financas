@@ -103,6 +103,11 @@ export const recurringAPI = {
   create:     (data) => api.post('/recurring', data),
   edit:       (id, data) => api.put(`/recurring/${id}`, data),
   delete:     (id) => api.delete(`/recurring/${id}`),
+  confirm: (id, month, year, actualAmount = null) => {
+    let url = `/recurring/${id}/confirm?month=${month}&year=${year}`
+    if (actualAmount != null) url += `&actualAmount=${actualAmount}`
+    return api.post(url)
+  },
   materialize: (id, month, year, actualAmount = null) => {
     let url = `/recurring/${id}/materialize?month=${month}&year=${year}`
     if (actualAmount != null) url += `&actualAmount=${actualAmount}`

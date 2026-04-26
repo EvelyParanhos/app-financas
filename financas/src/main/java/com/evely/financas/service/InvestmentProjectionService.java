@@ -107,7 +107,7 @@ public class InvestmentProjectionService {
      * que estão vinculadas a uma conta de investimento específica.
      */
     private BigDecimal somarAportesRecorrentes(UUID userId, UUID accountId) {
-        return recurringRepository.findByAccountOwnerId(userId)
+        return recurringRepository.findByUserId(userId)
             .stream()
             .filter(rt -> rt.getAccount().getId().equals(accountId))
             .filter(rt -> rt.getAccount().getType() == AccountType.INVESTMENT)

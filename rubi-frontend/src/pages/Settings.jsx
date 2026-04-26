@@ -306,7 +306,7 @@ function RecorrentesTab() {
     try {
       const [{ data: recs }, { data: accs }] = await Promise.all([
         recurringAPI.list(),
-        accountsAPI.list(false),
+        accountsAPI.list(true),
       ])
       setRecorrentes(recs || [])
       setAccounts(accs || [])
@@ -440,7 +440,11 @@ function RecorrentesTab() {
               onBlur={e => e.target.style.borderColor = 'var(--border)'}
             >
               <option value="">Carteira padrão (CASH)</option>
-              {accounts.filter(a => a.type !== 'CREDIT_CARD').map(a => (
+              {accounts
+                .filter(a => form.type === 'INCOME'
+                  ? (a.type === 'CASH' || a.type === 'CHECKING')
+                  : true)
+                .map(a => (
                 <option key={a.id} value={a.id}>{a.name} ({ACCOUNT_TYPE_LABELS[a.type]})</option>
               ))}
             </select>

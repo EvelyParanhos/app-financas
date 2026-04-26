@@ -5,6 +5,8 @@ import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import com.evely.financas.enums.TransactionType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -31,6 +33,12 @@ public class RecurringTransaction {
     @Column (name = "id", updatable = false, nullable = false)
     private UUID id;
 
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @JsonIgnore
+    private User user;
+
     private String description; 
     
     @Column (name = "estimated_amount")
@@ -53,6 +61,7 @@ public class RecurringTransaction {
     private Category category;
 
     @Column(name = "is_variable")
+    @JsonProperty("isVariable")
     private boolean variable;
 }
 

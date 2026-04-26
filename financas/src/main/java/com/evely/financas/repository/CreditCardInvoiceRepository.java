@@ -34,6 +34,20 @@ public interface CreditCardInvoiceRepository extends JpaRepository<CreditCardInv
 
     @Query("""
         SELECT i FROM CreditCardInvoice i
+        WHERE i.account.owner.id = :userId
+        AND i.dueDate BETWEEN :inicio AND :fim
+        AND i.totalAmount > 0
+        AND i.status IN ('OPEN', 'CLOSED', 'PARTIALLY_PAID', 'PAID')
+        ORDER BY i.dueDate ASC
+    """)
+    List<CreditCardInvoice> findChecklistInvoicesByUserIdAndDueDateBetween(
+        @Param("userId") UUID userId,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim
+    );
+
+    @Query("""
+        SELECT i FROM CreditCardInvoice i
         WHERE i.status = 'OPEN'
         AND i.closingDate <= :hoje
     """)
