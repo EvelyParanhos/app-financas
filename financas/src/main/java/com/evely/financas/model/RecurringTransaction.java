@@ -56,6 +56,11 @@ public class RecurringTransaction {
     private Account account; 
 
     @ManyToOne
+    @JoinColumn(name = "destination_account_id")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    private Account destinationAccount;
+
+    @ManyToOne
     @JoinColumn(name = "category_id")
     @JdbcTypeCode(SqlTypes.VARCHAR)
     private Category category;

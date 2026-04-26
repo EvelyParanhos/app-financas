@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   ChevronLeft, ChevronRight, Check, CreditCard, TrendingUp,
-  Wallet, Plus, ArrowDownLeft, ArrowUpRight, Repeat,
+  Wallet, Plus, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Repeat,
   PiggyBank, HandCoins, X, Info, Users, UserRound,
 } from 'lucide-react'
 import { dashboardAPI, installmentsAPI, recurringAPI, invoicesAPI } from '../services/api'
@@ -23,7 +23,7 @@ export default function Dashboard() {
   const [year,  setYear]  = useState(now.getFullYear())
   const [data,  setData]  = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showCouple, setShowCouple] = useState(false)
+  const [viewMode, setViewMode] = useState('mine')
   const [showNewTx, setShowNewTx]   = useState(false)
   const [payTarget, setPayTarget]   = useState(null)
 
@@ -34,14 +34,16 @@ export default function Dashboard() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const req = showCouple && user?.hasPartner
+      const req = viewMode === 'couple' && user?.hasPartner
         ? dashboardAPI.getCouple(month, year)
-        : dashboardAPI.get(month, year)
+        : viewMode === 'partner' && user?.hasPartner
+          ? dashboardAPI.getPartner(month, year)
+          : dashboardAPI.get(month, year)
       const { data: d } = await req
       setData(d)
     } catch { setData(null) }
     finally { setLoading(false) }
-  }, [month, year, showCouple, user])
+  }, [month, year, viewMode, user])
 
   useEffect(() => { load() }, [load])
 
@@ -114,16 +116,27 @@ export default function Dashboard() {
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {user?.hasPartner && (
-            <button onClick={() => setShowCouple(v => !v)} style={{
-              padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)',
-              background: showCouple ? 'rgba(46,203,170,0.1)' : 'var(--bg-raised)',
-              color: showCouple ? 'var(--teal)' : 'var(--text-secondary)',
-              fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-body)',
-              display: 'flex', alignItems: 'center', gap: 6,
+            <div style={{
+              display: 'flex', gap: 2, padding: 2, borderRadius: 8,
+              border: '1px solid var(--border)', background: 'var(--bg-raised)',
             }}>
-              {showCouple ? <Users size={12} /> : <UserRound size={12} />}
-              {showCouple ? 'Casal' : 'So eu'}
-            </button>
+              {[
+                { id: 'mine', label: 'So eu', icon: UserRound },
+                { id: 'couple', label: 'Casal', icon: Users },
+                { id: 'partner', label: 'Parceiro', icon: UserRound },
+              ].map(({ id, label, icon: Icon }) => (
+                <button key={id} onClick={() => setViewMode(id)} style={{
+                  padding: '5px 10px', borderRadius: 6, border: 'none',
+                  background: viewMode === id ? 'rgba(46,203,170,0.12)' : 'transparent',
+                  color: viewMode === id ? 'var(--teal)' : 'var(--text-secondary)',
+                  fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-body)',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}>
+                  <Icon size={12} />
+                  {label}
+                </button>
+              ))}
+            </div>
           )}
           <Button size="sm" onClick={() => setShowNewTx(true)} icon={<Plus size={13}/>}>
             Nova transação
@@ -462,11 +475,14 @@ function SCard({ label, value, icon, color, sub, onClick, active, noBorderRight 
 }
 
 function CheckItem({ item, isPaid, onCheck }) {
-  const isExpense = item.transactionType === 'EXPENSE' || !item.transactionType
+  const isTransfer = item.transactionType === 'TRANSFER'
+  const isExpense = item.transactionType === 'EXPENSE' || isTransfer || !item.transactionType
   const isVirtual = !!item.recurringTransactionId
   const isInvoice = item.checklistType === 'INVOICE' || !!item.invoiceId
   const typeIcon  = isInvoice
     ? <CreditCard size={11} color="var(--violet)" />
+    : isTransfer
+    ? <ArrowLeftRight size={11} color="var(--lime)" />
     : isVirtual
     ? <Repeat size={11} color="var(--teal)" />
     : isExpense

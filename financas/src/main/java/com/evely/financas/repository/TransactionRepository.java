@@ -29,6 +29,24 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     );
 
     @Query("""
+        SELECT DISTINCT t FROM Transaction t
+        LEFT JOIN FETCH t.category
+        LEFT JOIN FETCH t.account
+        LEFT JOIN FETCH t.destinationAccount
+        LEFT JOIN FETCH t.installments i
+        WHERE t.account.owner.id = :userId
+        AND t.isSimulation = false
+        AND t.description LIKE '[RECORRENTE]%'
+        AND t.purchaseDate BETWEEN :inicio AND :fim
+        ORDER BY t.purchaseDate ASC
+    """)
+    List<Transaction> findRecurringMaterializedByUserAndPeriod(
+        @Param("userId") UUID userId,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim
+    );
+
+    @Query("""
         SELECT SUM(t.totalAmount) FROM Transaction t
         WHERE t.account.id = :accountId
         AND t.purchaseDate >= :inicio

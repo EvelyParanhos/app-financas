@@ -42,8 +42,9 @@ export const accountsAPI = {
 }
 
 export const dashboardAPI = {
-  get:       (month, year) => api.get(`/dashboard?month=${month}&year=${year}`),
-  getCouple: (month, year) => api.get(`/dashboard/casal?month=${month}&year=${year}`),
+  get:        (month, year) => api.get(`/dashboard?month=${month}&year=${year}`),
+  getCouple:  (month, year) => api.get(`/dashboard/casal?month=${month}&year=${year}`),
+  getPartner: (month, year) => api.get(`/dashboard/parceiro?month=${month}&year=${year}`),
 }
 
 export const transactionsAPI = {

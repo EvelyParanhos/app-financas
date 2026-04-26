@@ -39,6 +39,11 @@ export default function Onboarding() {
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [savedAccounts, setSavedAccounts] = useState([])
+  const [defaultIncomeAccountId, setDefaultIncomeAccountId] = useState('')
+  const [defaultExpenseAccountId, setDefaultExpenseAccountId] = useState('')
+  const [defaultInvestmentSourceAccountId, setDefaultInvestmentSourceAccountId] = useState('')
+  const [defaultInvestmentAccountId, setDefaultInvestmentAccountId] = useState('')
 
   // Step 1 — contas
   const [accounts, setAccounts] = useState([
@@ -84,6 +89,16 @@ export default function Onboarding() {
         }
         await accountsAPI.create(payload)
       }
+      const { data: refreshedAccounts } = await accountsAPI.list(false)
+      const all = refreshedAccounts || []
+      setSavedAccounts(all)
+      const firstCash = all.find(a => a.type === 'CHECKING' || a.type === 'CASH')
+      const firstExpense = all.find(a => a.type !== 'INVESTMENT')
+      const firstInvestment = all.find(a => a.type === 'INVESTMENT')
+      setDefaultIncomeAccountId(firstCash?.id || '')
+      setDefaultExpenseAccountId(firstExpense?.id || firstCash?.id || '')
+      setDefaultInvestmentSourceAccountId(firstCash?.id || '')
+      setDefaultInvestmentAccountId(firstInvestment?.id || '')
       setStep(2)
     } catch (err) {
       setError(err.response?.data?.message || 'Erro ao salvar contas.')
@@ -94,6 +109,10 @@ export default function Onboarding() {
     setError(''); setLoading(true)
     try {
       const valid = incomes.filter(i => i.description.trim() && i.estimatedAmount)
+      if (valid.length && !defaultIncomeAccountId) {
+        setError('Selecione a conta padrao para receitas.')
+        setLoading(false); return
+      }
       for (const inc of valid) {
         await recurringAPI.create({
           description: inc.description.trim(),
@@ -101,6 +120,7 @@ export default function Onboarding() {
           dayOfMonth: parseInt(inc.dayOfMonth) || 5,
           type: 'INCOME',
           isVariable: false,
+          account: { id: defaultIncomeAccountId },
         })
       }
       setStep(3)
@@ -113,6 +133,10 @@ export default function Onboarding() {
     setError(''); setLoading(true)
     try {
       const valid = expenses.filter(e => e.description.trim() && e.estimatedAmount)
+      if (valid.length && !defaultExpenseAccountId) {
+        setError('Selecione a conta padrao para despesas.')
+        setLoading(false); return
+      }
       for (const exp of valid) {
         await recurringAPI.create({
           description: exp.description.trim(),
@@ -120,6 +144,7 @@ export default function Onboarding() {
           dayOfMonth: parseInt(exp.dayOfMonth) || 10,
           type: 'EXPENSE',
           isVariable: exp.isVariable,
+          account: { id: defaultExpenseAccountId },
         })
       }
       setStep(4)
@@ -272,6 +297,26 @@ export default function Onboarding() {
               <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
                 Cadastre suas <strong style={{ color: 'var(--text-primary)' }}>entradas mensais fixas</strong> — salário, freelances...
               </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <DefaultAccountSelect
+                  label="Receitas"
+                  value={defaultIncomeAccountId}
+                  onChange={setDefaultIncomeAccountId}
+                  accounts={savedAccounts.filter(a => a.type === 'CASH' || a.type === 'CHECKING')}
+                />
+                <DefaultAccountSelect
+                  label="Origem aportes"
+                  value={defaultInvestmentSourceAccountId}
+                  onChange={setDefaultInvestmentSourceAccountId}
+                  accounts={savedAccounts.filter(a => a.type === 'CASH' || a.type === 'CHECKING')}
+                />
+                <DefaultAccountSelect
+                  label="Investimento"
+                  value={defaultInvestmentAccountId}
+                  onChange={setDefaultInvestmentAccountId}
+                  accounts={savedAccounts.filter(a => a.type === 'INVESTMENT')}
+                />
+              </div>
               <div style={{
                 padding: '10px 14px', borderRadius: 8,
                 background: 'rgba(202,247,41,0.06)', border: '1px solid var(--border-accent)',
@@ -303,6 +348,12 @@ export default function Onboarding() {
               <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
                 Cadastre seus <strong style={{ color: 'var(--text-primary)' }}>gastos fixos mensais</strong> — aluguel, streaming, academia...
               </p>
+              <DefaultAccountSelect
+                label="Despesas e recorrencias"
+                value={defaultExpenseAccountId}
+                onChange={setDefaultExpenseAccountId}
+                accounts={savedAccounts.filter(a => a.type !== 'INVESTMENT')}
+              />
               {expenses.map((exp, i) => (
                 <RecurringForm key={i} item={exp} i={i} onChange={setExpense}
                   onRemove={() => setExpenses(a => a.filter((_, idx) => idx !== i))}
@@ -391,6 +442,26 @@ export default function Onboarding() {
 }
 
 // ── Sub-componentes ─────────────────────────────────────────────────────
+
+function DefaultAccountSelect({ label, value, onChange, accounts }) {
+  return (
+    <Field label={label} htmlFor={`default-${label}`}>
+      <select
+        id={`default-${label}`}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        style={inputStyle}
+        onFocus={e => e.target.style.borderColor = 'var(--lime)'}
+        onBlur={e => e.target.style.borderColor = 'var(--border)'}
+      >
+        <option value="">Selecionar...</option>
+        {accounts.map(a => (
+          <option key={a.id} value={a.id}>{a.name}</option>
+        ))}
+      </select>
+    </Field>
+  )
+}
 
 function AccountForm({ acc, i, onChange, onRemove, canRemove }) {
   return (

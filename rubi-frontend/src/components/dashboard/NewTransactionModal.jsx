@@ -79,7 +79,7 @@ export default function NewTransactionModal({ onClose, onSaved, month, year }) {
 
   // Destino da transferência: CASH ou CHECKING, diferente da origem
   const accountsForDest = allAccounts
-    .filter(a => (a.type === 'CASH' || a.type === 'CHECKING') && a.id !== accountId)
+    .filter(a => (a.type === 'CASH' || a.type === 'CHECKING' || a.type === 'INVESTMENT') && a.id !== accountId)
 
   // Categorias filtradas por tipo
   const filteredCategories = categories.filter(c => {
@@ -295,7 +295,7 @@ export default function NewTransactionModal({ onClose, onSaved, month, year }) {
               )}
               {type === 'TRANSFER' && (
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                  Transferências apenas entre Carteira e Conta corrente.
+                  Transferencias podem ir para Carteira, Conta corrente ou Investimento.
                 </div>
               )}
             </Field>

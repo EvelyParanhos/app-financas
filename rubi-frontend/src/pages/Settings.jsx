@@ -3,7 +3,7 @@ import {
   Wallet, Building2, CreditCard, PiggyBank,
   Plus, Trash2, Check, X, Copy,
   Users, UserX, Share2, Edit2,
-  ArrowUpRight, ArrowDownLeft,
+  ArrowUpRight, ArrowDownLeft, ArrowLeftRight,
 } from 'lucide-react'
 import {
   accountsAPI, categoriesAPI,
@@ -297,7 +297,7 @@ function RecorrentesTab() {
   const [editItem, setEditItem]       = useState(null)
   const [form, setForm]               = useState({
     description: '', estimatedAmount: '', dayOfMonth: '',
-    type: 'EXPENSE', isVariable: false, accountId: '',
+    type: 'EXPENSE', isVariable: false, accountId: '', destinationAccountId: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
@@ -315,13 +315,20 @@ function RecorrentesTab() {
   useEffect(() => { load() }, [])
 
   const reset = () => {
-    setForm({ description: '', estimatedAmount: '', dayOfMonth: '', type: 'EXPENSE', isVariable: false, accountId: '' })
+    setForm({ description: '', estimatedAmount: '', dayOfMonth: '', type: 'EXPENSE', isVariable: false, accountId: '', destinationAccountId: '' })
     setEditItem(null); setShowForm(false); setError('')
   }
 
   const save = async () => {
     if (!form.description.trim()) return setError('Informe uma descrição')
     if (!form.estimatedAmount)    return setError('Informe o valor estimado')
+    if (!form.accountId)          return setError('Selecione a conta')
+    if (form.type === 'TRANSFER' && !form.destinationAccountId) {
+      return setError('Selecione a conta de destino')
+    }
+    if (form.type === 'TRANSFER' && form.destinationAccountId === form.accountId) {
+      return setError('Origem e destino devem ser contas diferentes')
+    }
     setLoading(true); setError('')
     try {
       const payload = {
@@ -330,7 +337,10 @@ function RecorrentesTab() {
         dayOfMonth:      parseInt(form.dayOfMonth) || 1,
         type:            form.type,
         isVariable:      form.isVariable,
-        account: form.accountId ? { id: form.accountId } : undefined,
+        account:         { id: form.accountId },
+      }
+      if (form.type === 'TRANSFER') {
+        payload.destinationAccount = { id: form.destinationAccountId }
       }
       if (editItem) await recurringAPI.edit(editItem.id, payload)
       else await recurringAPI.create(payload)
@@ -354,6 +364,7 @@ function RecorrentesTab() {
       type:            rec.type,
       isVariable:      rec.isVariable || false,
       accountId:       rec.account?.id || '',
+      destinationAccountId: rec.destinationAccount?.id || '',
     })
     setShowForm(true)
     setError('')
@@ -361,6 +372,15 @@ function RecorrentesTab() {
 
   const incomes  = recorrentes.filter(r => r.type === 'INCOME')
   const expenses = recorrentes.filter(r => r.type === 'EXPENSE')
+  const transfers = recorrentes.filter(r => r.type === 'TRANSFER')
+  const originAccounts = accounts.filter(a => {
+    if (form.type === 'INCOME') return a.type === 'CASH' || a.type === 'CHECKING'
+    if (form.type === 'TRANSFER') return a.type === 'CASH' || a.type === 'CHECKING'
+    return a.type !== 'INVESTMENT'
+  })
+  const destinationAccounts = accounts.filter(a =>
+    (a.type === 'CASH' || a.type === 'CHECKING' || a.type === 'INVESTMENT') && a.id !== form.accountId
+  )
 
   return (
     <div style={{ maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -388,11 +408,12 @@ function RecorrentesTab() {
             {[
               { val: 'EXPENSE', label: 'Gasto',   icon: ArrowUpRight,   color: 'var(--danger)' },
               { val: 'INCOME',  label: 'Entrada',  icon: ArrowDownLeft,  color: 'var(--mint)' },
+              { val: 'TRANSFER', label: 'Aporte',  icon: ArrowLeftRight, color: 'var(--lime)' },
             ].map(({ val, label, icon: Icon, color }) => (
               <button key={val} onClick={() => setForm(f => ({ ...f, type: val }))} style={{
                 flex: 1, padding: '10px', borderRadius: 8, cursor: 'pointer',
                 border: `1.5px solid ${form.type === val ? color : 'var(--border)'}`,
-                background: form.type === val ? `rgba(${val === 'EXPENSE' ? '240,82,82' : '121,221,126'},0.08)` : 'var(--bg-raised)',
+                background: form.type === val ? `rgba(${val === 'EXPENSE' ? '240,82,82' : val === 'INCOME' ? '121,221,126' : '202,247,41'},0.08)` : 'var(--bg-raised)',
                 color: form.type === val ? color : 'var(--text-muted)',
                 fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -432,23 +453,36 @@ function RecorrentesTab() {
           </div>
 
           {/* Conta (opcional) */}
-          <Field label="Conta (opcional)" htmlFor="rec-account">
+          <div style={{ display: 'grid', gridTemplateColumns: form.type === 'TRANSFER' ? '1fr 1fr' : '1fr', gap: 10 }}>
+          <Field label={form.type === 'INCOME' ? 'Receber em' : form.type === 'TRANSFER' ? 'De (origem)' : 'Pagar com'} htmlFor="rec-account">
             <select id="rec-account" value={form.accountId}
-              onChange={e => setForm(f => ({ ...f, accountId: e.target.value }))}
+              onChange={e => setForm(f => ({ ...f, accountId: e.target.value, destinationAccountId: f.destinationAccountId === e.target.value ? '' : f.destinationAccountId }))}
               style={selectStyle}
               onFocus={e => e.target.style.borderColor = 'var(--lime)'}
               onBlur={e => e.target.style.borderColor = 'var(--border)'}
             >
-              <option value="">Carteira padrão (CASH)</option>
-              {accounts
-                .filter(a => form.type === 'INCOME'
-                  ? (a.type === 'CASH' || a.type === 'CHECKING')
-                  : true)
-                .map(a => (
+              <option value="">Selecionar conta...</option>
+              {originAccounts.map(a => (
                 <option key={a.id} value={a.id}>{a.name} ({ACCOUNT_TYPE_LABELS[a.type]})</option>
               ))}
             </select>
           </Field>
+          {form.type === 'TRANSFER' && (
+            <Field label="Para (destino)" htmlFor="rec-dest">
+              <select id="rec-dest" value={form.destinationAccountId}
+                onChange={e => setForm(f => ({ ...f, destinationAccountId: e.target.value }))}
+                style={selectStyle}
+                onFocus={e => e.target.style.borderColor = 'var(--lime)'}
+                onBlur={e => e.target.style.borderColor = 'var(--border)'}
+              >
+                <option value="">Selecionar destino...</option>
+                {destinationAccounts.map(a => (
+                  <option key={a.id} value={a.id}>{a.name} ({ACCOUNT_TYPE_LABELS[a.type]})</option>
+                ))}
+              </select>
+            </Field>
+          )}
+          </div>
 
           {form.type === 'EXPENSE' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, color: 'var(--text-secondary)' }}>
@@ -486,6 +520,7 @@ function RecorrentesTab() {
       {[
         { title: 'Entradas fixas', items: incomes, color: 'var(--mint)', icon: ArrowDownLeft },
         { title: 'Gastos fixos',   items: expenses, color: 'var(--danger)', icon: ArrowUpRight },
+        { title: 'Aportes recorrentes', items: transfers, color: 'var(--lime)', icon: ArrowLeftRight },
       ].map(({ title, items, color, icon: Icon }) => (
         <div key={title}>
           <div style={{
@@ -517,7 +552,8 @@ function RecorrentesTab() {
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                     Dia {rec.dayOfMonth}
                     {rec.isVariable ? ' • valor variável' : ''}
-                    {rec.account ? ` • ${rec.account.name}` : ''}
+                    {rec.account ? ` - ${rec.account.name}` : ''}
+                    {rec.destinationAccount ? ` -> ${rec.destinationAccount.name}` : ''}
                   </div>
                 </div>
                 <div style={{

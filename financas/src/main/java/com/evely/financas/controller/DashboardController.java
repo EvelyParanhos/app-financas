@@ -41,4 +41,16 @@ public class DashboardController {
 
         return ResponseEntity.ok(dashboardService.getDashboardCasal(user.getId(), m, y));
     }
+
+    @GetMapping("/parceiro")
+    public ResponseEntity<DashboardDTO> getDashboardParceiro(
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
+            @AuthenticationPrincipal User user) {
+
+        int m = month != null ? month : LocalDate.now().getMonthValue();
+        int y = year != null ? year : LocalDate.now().getYear();
+
+        return ResponseEntity.ok(dashboardService.getDashboardParceiro(user.getId(), m, y));
+    }
 }

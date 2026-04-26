@@ -19,6 +19,7 @@ export function Register() {
     e.preventDefault()
     setError(''); setLoading(true)
     try {
+      localStorage.removeItem('rubi_token')
       await authAPI.register(form.name, form.email, form.password)
       navigate('/verify', { state: { email: form.email } })
     } catch (err) {

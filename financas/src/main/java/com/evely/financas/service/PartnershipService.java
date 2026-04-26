@@ -42,7 +42,12 @@ public class PartnershipService {
         User userB = userRepository.findById(convidadoId)
             .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado."));
 
-        if (userA.getId().equals(userB.getId())) {
+        boolean mesmoId = userA.getId().equals(userB.getId());
+        boolean mesmoEmail = userA.getEmail() != null
+            && userB.getEmail() != null
+            && userA.getEmail().equalsIgnoreCase(userB.getEmail());
+
+        if (mesmoId || mesmoEmail) {
             throw new RuntimeException("Você não pode criar uma parceria consigo mesmo.");
         }
 

@@ -101,12 +101,12 @@ export default function NewSimulationModal({ onClose, onSaved, month, year }) {
       <div style={{
         position: 'fixed', top: '50%', left: '50%',
         transform: 'translate(-50%, -50%)',
-        width: '100%', maxWidth: 460,
+        width: 'min(460px, calc(100vw - 32px))',
         background: 'var(--bg-raised)',
         border: '1px solid rgba(136,141,218,0.35)',
         borderRadius: 16, overflow: 'hidden', zIndex: 101,
-        animation: 'fadeUp 0.25s var(--ease) both',
-        maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+        animation: 'modalEnter 0.25s var(--ease) both',
+        maxHeight: 'calc(100vh - 32px)', display: 'flex', flexDirection: 'column',
       }}>
         {/* Header */}
         <div style={{

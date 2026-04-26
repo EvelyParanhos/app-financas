@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, Plus, PiggyBank, History, ChevronDown, ChevronUp } from 'lucide-react'
+import { TrendingUp, Plus, PiggyBank, History, ChevronDown, ChevronUp, X, Check } from 'lucide-react'
 import { investmentsAPI } from '../services/api'
 import { Button, Badge } from '../components/ui/FormElements'
 
@@ -12,19 +12,22 @@ export default function Investments() {
   const [projection, setProjection] = useState([])
   const [loading,    setLoading]    = useState(true)
   const [expanded,   setExpanded]   = useState(null)
+  const [showEntry,  setShowEntry]  = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const [{ data: s }, { data: p }] = await Promise.all([
+        investmentsAPI.summary(),
+        investmentsAPI.projection(12),
+      ])
+      setSummaries(s || [])
+      setProjection(p || [])
+    } catch { setSummaries([]); setProjection([]) }
+    finally { setLoading(false) }
+  }
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [{ data: s }, { data: p }] = await Promise.all([
-          investmentsAPI.summary(),
-          investmentsAPI.projection(12),
-        ])
-        setSummaries(s || [])
-        setProjection(p || [])
-      } catch { setSummaries([]); setProjection([]) }
-      finally { setLoading(false) }
-    }
     load()
   }, [])
 
@@ -40,13 +43,18 @@ export default function Investments() {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, letterSpacing: '-0.03em' }}>
-          Investimentos
+      <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, letterSpacing: '-0.03em' }}>
+            Investimentos
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+            Reservas, aportes e projeções
+          </div>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-          Reservas, aportes e projeções
-        </div>
+        <Button size="sm" onClick={() => setShowEntry(true)} icon={<Plus size={14}/>}>
+          Novo investimento
+        </Button>
       </div>
 
       <div className="scrollable" style={{ flex: 1, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -112,7 +120,100 @@ export default function Investments() {
           </div>
         )}
       </div>
+      {showEntry && (
+        <InvestmentEntryModal
+          summaries={summaries}
+          onClose={() => setShowEntry(false)}
+          onSaved={() => { setShowEntry(false); load() }}
+        />
+      )}
     </div>
+  )
+}
+
+function InvestmentEntryModal({ summaries, onClose, onSaved }) {
+  const [accountId, setAccountId] = useState(summaries[0]?.accountId || '')
+  const [type, setType] = useState('DEPOSIT')
+  const [amount, setAmount] = useState('')
+  const [date, setDate] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
+  const [notes, setNotes] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const submit = async () => {
+    if (!accountId) return setError('Selecione uma conta de investimento.')
+    if (!amount || Number(amount) <= 0) return setError('Informe um valor maior que zero.')
+    setLoading(true); setError('')
+    try {
+      await investmentsAPI.entry({
+        accountId,
+        type,
+        amount: Number(amount),
+        entryDate: date,
+        notes: notes.trim() || null,
+      })
+      onSaved()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erro ao registrar investimento.')
+    } finally { setLoading(false) }
+  }
+
+  const input = {
+    width: '100%', padding: '12px 14px', minHeight: 44,
+    background: 'var(--bg-float)', border: '1.5px solid var(--border)',
+    borderRadius: 8, color: 'var(--text-primary)', outline: 'none',
+    fontFamily: 'var(--font-body)', fontSize: 14,
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 100 }} />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+        width: 'min(460px, calc(100vw - 32px))', maxHeight: 'calc(100vh - 32px)',
+        background: 'var(--bg-raised)', border: '1px solid var(--border)', borderRadius: 16,
+        overflow: 'hidden', zIndex: 101, animation: 'modalEnter 0.25s var(--ease) both',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>Novo investimento</div>
+          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'var(--bg-overlay)', color: 'var(--text-muted)', cursor: 'pointer' }}>
+            <X size={14} />
+          </button>
+        </div>
+        <div className="scrollable" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <select value={accountId} onChange={e => setAccountId(e.target.value)} style={input}>
+            <option value="">Selecionar investimento...</option>
+            {summaries.map(s => <option key={s.accountId} value={s.accountId}>{s.accountName}</option>)}
+          </select>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6 }}>
+            {[
+              ['DEPOSIT', 'Aporte'],
+              ['WITHDRAWAL', 'Resgate'],
+              ['YIELD', 'Rendimento'],
+            ].map(([id, label]) => (
+              <button key={id} onClick={() => setType(id)} style={{
+                padding: '9px 8px', borderRadius: 8, border: `1px solid ${type === id ? 'var(--lime)' : 'var(--border)'}`,
+                background: type === id ? 'rgba(202,247,41,0.08)' : 'var(--bg-float)',
+                color: type === id ? 'var(--lime)' : 'var(--text-secondary)', cursor: 'pointer',
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
+              }}>{label}</button>
+            ))}
+          </div>
+          <input type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Valor" style={input} />
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...input, colorScheme: 'dark' }} />
+          <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Observacao" style={input} />
+          {error && <div style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</div>}
+        </div>
+        <div style={{ padding: '14px 18px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '11px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-float)', color: 'var(--text-secondary)', cursor: 'pointer' }}>Cancelar</button>
+          <Button onClick={submit} loading={loading} icon={<Check size={14}/>} style={{ flex: 2 }}>Registrar</Button>
+        </div>
+      </div>
+    </>
   )
 }
 

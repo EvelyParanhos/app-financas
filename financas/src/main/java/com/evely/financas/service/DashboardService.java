@@ -54,7 +54,8 @@ public class DashboardService {
         BigDecimal fromInstallments = safe(installmentRepository.somarDividasComFiltro(
             userId, inicio, fim, false));
         BigDecimal virtualExpenses = calcularVirtualRecurrentes(userId, inicio, fim, TransactionType.EXPENSE);
-        BigDecimal committed = fromInstallments.add(virtualExpenses).add(ccCommitted);
+        BigDecimal virtualInvestmentTransfers = calcularVirtualRecurrentes(userId, inicio, fim, TransactionType.TRANSFER);
+        BigDecimal committed = fromInstallments.add(virtualExpenses).add(virtualInvestmentTransfers).add(ccCommitted);
 
         // ── Renda prevista ───────────────────────────────────────────
         BigDecimal incomeInstallments = safe(installmentRepository.somarReceitasPrevistas(userId, inicio, fim));
@@ -74,10 +75,7 @@ public class DashboardService {
         BigDecimal monthlyDeposits = safe(investmentEntryRepository.somarAportesMensais(userId, month, year));
 
         // ── Checklist ────────────────────────────────────────────────
-        List<InstallmentItemDTO> installmentItems = installmentRepository
-            .findChecklistWithDetailsByUserAndPeriod(userId, inicio, fim)
-            .stream().map(this::toInstallmentItem).collect(Collectors.toList());
-
+        List<InstallmentItemDTO> installmentItems = buildRecorrenciasMaterializadas(userId, inicio, fim);
         installmentItems.addAll(buildRecurrentesVirtuais(userId, inicio, fim));
         installmentItems.addAll(buildFaturasChecklist(userId, inicio, fim));
         installmentItems.sort(Comparator.comparing(
@@ -121,7 +119,10 @@ public class DashboardService {
 
         BigDecimal committedUsuario = safe(installmentRepository.somarDividasComFiltro(userId, inicio, fim, false));
         BigDecimal committedParceiro = safe(installmentRepository.somarDividasComFiltroEContaShared(partnerId, inicio, fim));
-        BigDecimal totalCommitted = committedUsuario.add(committedParceiro);
+        BigDecimal totalCommitted = committedUsuario
+            .add(committedParceiro)
+            .add(calcularVirtualRecurrentes(userId, inicio, fim, TransactionType.EXPENSE))
+            .add(calcularVirtualRecurrentes(userId, inicio, fim, TransactionType.TRANSFER));
 
         BigDecimal projectedIncome = safe(installmentRepository.somarReceitasPrevistas(userId, inicio, fim));
 
@@ -137,17 +138,9 @@ public class DashboardService {
         BigDecimal monthlyDeposits = safe(investmentEntryRepository.somarAportesMensais(userId, month, year))
             .add(safe(investmentEntryRepository.somarAportesMensais(partnerId, month, year)));
 
-        List<Installment> parcelasUsuario = installmentRepository
-            .findChecklistWithDetailsByUserAndPeriod(userId, inicio, fim);
-        List<Installment> parcelasParceiro = installmentRepository
-            .findChecklistSharedByPartnerAndPeriod(partnerId, inicio, fim);
-
-        List<InstallmentItemDTO> installmentItems = Stream
-            .concat(parcelasUsuario.stream(), parcelasParceiro.stream())
-            .map(this::toInstallmentItem)
-            .sorted(Comparator.comparing(InstallmentItemDTO::getDueDate,
-                Comparator.nullsLast(Comparator.naturalOrder())))
-            .collect(Collectors.toList());
+        List<InstallmentItemDTO> installmentItems = new ArrayList<>();
+        installmentItems.addAll(buildRecorrenciasMaterializadas(userId, inicio, fim));
+        installmentItems.addAll(buildRecurrentesVirtuais(userId, inicio, fim));
         installmentItems.addAll(buildFaturasChecklist(userId, inicio, fim));
         installmentItems.sort(Comparator.comparing(
             InstallmentItemDTO::getDueDate, Comparator.nullsLast(Comparator.naturalOrder())));
@@ -164,6 +157,17 @@ public class DashboardService {
             invoices, installmentItems, recentTransactions,
             budgets, projection, true
         );
+    }
+
+    public DashboardDTO getDashboardParceiro(UUID userId, int month, int year) {
+        Partnership partnership = partnershipRepository.findByUserId(userId)
+            .orElseThrow(() -> new RuntimeException("Nenhuma conexao encontrada."));
+
+        UUID partnerId = partnership.getUserA().getId().equals(userId)
+            ? partnership.getUserB().getId()
+            : partnership.getUserA().getId();
+
+        return getDashboard(partnerId, month, year);
     }
 
     // =========================================================
@@ -247,6 +251,43 @@ public class DashboardService {
             .toList();
     }
 
+    private List<InstallmentItemDTO> buildRecorrenciasMaterializadas(UUID userId, LocalDate inicio, LocalDate fim) {
+        List<RecurringTransaction> moldes = recurringRepository.findByUserId(userId);
+        return transactionRepository.findRecurringMaterializedByUserAndPeriod(userId, inicio, fim)
+            .stream()
+            .map(t -> {
+                InstallmentStatus status = t.getInstallments() != null && !t.getInstallments().isEmpty()
+                    ? t.getInstallments().get(0).getStatus()
+                    : InstallmentStatus.PAID;
+                UUID recurringId = moldes.stream()
+                    .filter(rt -> ("[RECORRENTE] " + rt.getDescription()).equals(t.getDescription()))
+                    .filter(rt -> rt.getAccount() != null && t.getAccount() != null
+                        && rt.getAccount().getId().equals(t.getAccount().getId()))
+                    .map(RecurringTransaction::getId)
+                    .findFirst()
+                    .orElse(null);
+
+                return new InstallmentItemDTO(
+                    t.getInstallments() != null && !t.getInstallments().isEmpty()
+                        ? t.getInstallments().get(0).getId()
+                        : null,
+                    t.getDescription().replace("[RECORRENTE] ", ""),
+                    t.getCategory() != null ? t.getCategory().getName() : tipoRecorrenteLabel(t),
+                    t.getTotalAmount(),
+                    t.getPurchaseDate(),
+                    status,
+                    false,
+                    null,
+                    recurringId,
+                    t.getType() != null ? t.getType().name() : "EXPENSE",
+                    "RECURRING",
+                    null,
+                    nomeContaRecorrente(t)
+                );
+            })
+            .toList();
+    }
+
     private InstallmentItemDTO toInstallmentItem(Installment i) {
         Transaction t = i.getTransaction();
         return new InstallmentItemDTO(
@@ -262,7 +303,9 @@ public class DashboardService {
     private BigDecimal calcularVirtualRecurrentes(UUID userId, LocalDate inicio, LocalDate fim, TransactionType tipo) {
         return recurringRepository.findByUserId(userId).stream()
             .filter(rt -> rt.getType() == tipo)
-            .filter(rt -> rt.getAccount().getType() != AccountType.INVESTMENT)
+            .filter(rt -> tipo != TransactionType.TRANSFER
+                || (rt.getDestinationAccount() != null
+                    && rt.getDestinationAccount().getType() == AccountType.INVESTMENT))
             .filter(rt -> !transactionRepository.existsByDescriptionAndAccountIdAndPurchaseDateBetween(
                 "[RECORRENTE] " + rt.getDescription(), rt.getAccount().getId(), inicio, fim))
             .map(rt -> rt.getEstimatedAmount() != null ? rt.getEstimatedAmount() : BigDecimal.ZERO)
@@ -271,8 +314,10 @@ public class DashboardService {
 
     private BigDecimal estimarGastosFixos(UUID userId) {
         return recurringRepository.findByUserId(userId).stream()
-            .filter(r -> r.getType() == TransactionType.EXPENSE)
-            .filter(r -> r.getAccount().getType() != AccountType.INVESTMENT)
+            .filter(r -> r.getType() == TransactionType.EXPENSE
+                || (r.getType() == TransactionType.TRANSFER
+                    && r.getDestinationAccount() != null
+                    && r.getDestinationAccount().getType() == AccountType.INVESTMENT))
             .map(r -> r.getEstimatedAmount() != null ? r.getEstimatedAmount() : BigDecimal.ZERO)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
@@ -280,8 +325,12 @@ public class DashboardService {
     private List<InstallmentItemDTO> buildRecurrentesVirtuais(UUID userId, LocalDate inicio, LocalDate fim) {
         List<InstallmentItemDTO> virtuais = new ArrayList<>();
         for (RecurringTransaction rt : recurringRepository.findByUserId(userId)) {
-            if (rt.getType() != TransactionType.EXPENSE && rt.getType() != TransactionType.INCOME) continue;
-            if (rt.getAccount().getType() == AccountType.INVESTMENT) continue;
+            if (rt.getType() != TransactionType.EXPENSE
+                    && rt.getType() != TransactionType.INCOME
+                    && rt.getType() != TransactionType.TRANSFER) continue;
+            if (rt.getType() == TransactionType.TRANSFER
+                    && (rt.getDestinationAccount() == null
+                        || rt.getDestinationAccount().getType() != AccountType.INVESTMENT)) continue;
 
             String descMaterializada = "[RECORRENTE] " + rt.getDescription();
             boolean jaMaterializada = transactionRepository.existsByDescriptionAndAccountIdAndPurchaseDateBetween(
@@ -291,13 +340,13 @@ public class DashboardService {
                 int dia = Math.min(rt.getDayOfMonth(), inicio.lengthOfMonth());
                 virtuais.add(new InstallmentItemDTO(
                     null, rt.getDescription(),
-                    rt.getCategory() != null ? rt.getCategory().getName() : "Fixo",
+                    rt.getCategory() != null ? rt.getCategory().getName() : tipoRecorrenteLabel(rt),
                     rt.getEstimatedAmount() != null ? rt.getEstimatedAmount() : BigDecimal.ZERO,
                     inicio.withDayOfMonth(dia),
                     InstallmentStatus.PENDING, false, null,
                     rt.getId(),
                     rt.getType().name(),
-                    "RECURRING", null, rt.getAccount() != null ? rt.getAccount().getName() : null
+                    "RECURRING", null, nomeContaRecorrente(rt)
                 ));
             }
         }
@@ -342,6 +391,32 @@ public class DashboardService {
                 );
             })
             .toList();
+    }
+
+    private String tipoRecorrenteLabel(RecurringTransaction rt) {
+        if (rt.getType() == TransactionType.TRANSFER) return "Aporte em investimento";
+        if (rt.getType() == TransactionType.INCOME) return "Entrada fixa";
+        return "Fixo";
+    }
+
+    private String tipoRecorrenteLabel(Transaction t) {
+        if (t.getType() == TransactionType.TRANSFER) return "Aporte em investimento";
+        if (t.getType() == TransactionType.INCOME) return "Entrada fixa";
+        return "Fixo";
+    }
+
+    private String nomeContaRecorrente(RecurringTransaction rt) {
+        if (rt.getType() == TransactionType.TRANSFER && rt.getDestinationAccount() != null) {
+            return rt.getAccount().getName() + " -> " + rt.getDestinationAccount().getName();
+        }
+        return rt.getAccount() != null ? rt.getAccount().getName() : null;
+    }
+
+    private String nomeContaRecorrente(Transaction t) {
+        if (t.getType() == TransactionType.TRANSFER && t.getDestinationAccount() != null) {
+            return t.getAccount().getName() + " -> " + t.getDestinationAccount().getName();
+        }
+        return t.getAccount() != null ? t.getAccount().getName() : null;
     }
 
     /** Evita NullPointerException em somas que podem retornar null do JPQL. */

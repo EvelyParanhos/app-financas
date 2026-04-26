@@ -34,6 +34,7 @@ public class TransactionService {
     private final BalanceService balanceService;
     private final AccountRepository accountRepository;
     private final CreditCardInvoiceService creditCardInvoiceService;
+    private final AccountService accountService;
 
     // =========================================================
     // LISTAGEM COM FILTROS — GET /api/transactions
@@ -70,9 +71,14 @@ public class TransactionService {
 
     @Transactional
     public Transaction registrarTransacao(Transaction transacao, int totalParcelas, UUID userId) {
-        Account conta = accountRepository.findById(transacao.getAccount().getId())
-            .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
+        Account conta = accountService.buscarContaComAcessoPermitido(transacao.getAccount().getId(), userId);
         transacao.setAccount(conta);
+        if (transacao.getTotalAmount() == null || transacao.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Informe um valor maior que zero.");
+        }
+        if (totalParcelas < 1) {
+            throw new RuntimeException("A quantidade de parcelas deve ser maior que zero.");
+        }
 
         boolean ehCartao = conta.getType() == AccountType.CREDIT_CARD;
         User pagador = userRepository.findById(userId)
@@ -100,18 +106,34 @@ public class TransactionService {
         }
 
         if (transacao.getType() == TransactionType.TRANSFER) {
-            Account destino = accountRepository.findById(transacao.getDestinationAccount().getId())
-                .orElseThrow(() -> new ObjectNotFoundException("Conta de destino nao encontrada"));
+            Account destino = accountService.buscarContaComAcessoPermitido(
+                transacao.getDestinationAccount().getId(), userId);
 
             if (conta.getId().equals(destino.getId())) {
                 throw new RuntimeException("Origem e destino devem ser contas diferentes.");
             }
-            if (!isContaDeCaixa(conta) || !isContaDeCaixa(destino)) {
+            if (!isContaDeCaixa(conta) || (!isContaDeCaixa(destino) && destino.getType() != AccountType.INVESTMENT)) {
                 throw new RuntimeException(
-                    "Transferencias internas so podem ocorrer entre carteira e conta corrente.");
+                    "Transferencias podem sair de carteira/conta corrente para carteira, conta corrente ou investimento.");
             }
 
             transacao.setDestinationAccount(destino);
+            transacao.setCategory(null);
+        } else {
+            transacao.setDestinationAccount(null);
+        }
+
+        if (transacao.getType() == TransactionType.TRANSFER) {
+            Transaction transacaoSalva = transactionRepository.save(transacao);
+            if (!transacaoSalva.isSimulation()) {
+                balanceService.transferir(
+                    transacaoSalva.getAccount(),
+                    transacaoSalva.getDestinationAccount(),
+                    transacaoSalva.getTotalAmount(),
+                    userId
+                );
+            }
+            return transacaoSalva;
         }
 
         BigDecimal valorParcela = transacao.getTotalAmount()

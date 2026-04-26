@@ -7,9 +7,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import com.evely.financas.dto.InvestmentEntryDTO;
 import com.evely.financas.enums.AccountType;
-import com.evely.financas.enums.InvestmentEntryType;
 import com.evely.financas.enums.TransactionType;
 import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Account;
@@ -17,7 +15,6 @@ import com.evely.financas.model.Installment;
 import com.evely.financas.model.RecurringTransaction;
 import com.evely.financas.model.Transaction;
 import com.evely.financas.model.User;
-import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.RecurringTransactionRepository;
 import com.evely.financas.repository.TransactionRepository;
 import jakarta.transaction.Transactional;
@@ -33,9 +30,7 @@ public class RecurringTransactionService {
     private final TransactionRepository transactionRepository;
     private final TransactionService transactionService;
     private final CreditCardInvoiceService invoiceService;
-    private final InvestmentService investmentService;
     private final InstallmentService installmentService;
-    private final AccountRepository accountRepository;
     private final AccountService accountService;
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -48,19 +43,20 @@ public class RecurringTransactionService {
         rt.setUser(user);
 
         if (rt.getAccount() == null || rt.getAccount().getId() == null) {
-            Account carteira = accountRepository
-                .findByOwnerId(user.getId())
-                .stream()
-                .filter(a -> a.getType() == AccountType.CASH)
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Carteira nao encontrada"));
-            rt.setAccount(carteira);
-        } else {
-            Account conta = accountService
-                .buscarContaComAcessoPermitido(rt.getAccount().getId(), user.getId());
-            validarContaParaRecorrencia(rt.getType(), conta);
-            rt.setAccount(conta);
+            throw new RuntimeException("Selecione a conta da recorrencia.");
         }
+
+        Account conta = accountService
+            .buscarContaComAcessoPermitido(rt.getAccount().getId(), user.getId());
+        rt.setAccount(conta);
+
+        Account destino = null;
+        if (rt.getDestinationAccount() != null && rt.getDestinationAccount().getId() != null) {
+            destino = accountService
+                .buscarContaComAcessoPermitido(rt.getDestinationAccount().getId(), user.getId());
+        }
+        validarContaParaRecorrencia(rt.getType(), conta, destino);
+        rt.setDestinationAccount(rt.getType() == TransactionType.TRANSFER ? destino : null);
 
         return recurringRepository.save(rt);
     }
@@ -88,6 +84,19 @@ public class RecurringTransactionService {
         rt.setDayOfMonth(dados.getDayOfMonth());
         rt.setType(dados.getType());
         rt.setVariable(dados.isVariable());
+        if (dados.getAccount() == null || dados.getAccount().getId() == null) {
+            throw new RuntimeException("Selecione a conta da recorrencia.");
+        }
+        Account conta = accountService
+            .buscarContaComAcessoPermitido(dados.getAccount().getId(), userId);
+        Account destino = null;
+        if (dados.getDestinationAccount() != null && dados.getDestinationAccount().getId() != null) {
+            destino = accountService
+                .buscarContaComAcessoPermitido(dados.getDestinationAccount().getId(), userId);
+        }
+        validarContaParaRecorrencia(dados.getType(), conta, destino);
+        rt.setAccount(conta);
+        rt.setDestinationAccount(dados.getType() == TransactionType.TRANSFER ? destino : null);
         if (dados.getCategory() != null) rt.setCategory(dados.getCategory());
         return recurringRepository.save(rt);
     }
@@ -142,8 +151,7 @@ public class RecurringTransactionService {
 
         // Para contas de investimento, verifica via InvestmentEntry notes
         // Para as demais, verifica via Transaction description
-        if (molde.getAccount().getType() != AccountType.INVESTMENT
-                && jaMaterializadaNoPeriodo(molde, inicioMes, fimMes)) {
+        if (jaMaterializadaNoPeriodo(molde, inicioMes, fimMes)) {
             throw new RuntimeException(
                 "Esta transação já foi registrada para " + month + "/" + year + ".");
         }
@@ -179,25 +187,12 @@ public class RecurringTransactionService {
         // Não passa pelo checklist (sem Transaction + Installment).
         // Isso é correto: o aporte na reserva é imediato ao ser confirmado.
         // O histórico fica rastreado em InvestmentEntry, assim como os aportes manuais.
-        if (molde.getAccount().getType() == AccountType.INVESTMENT) {
-            InvestmentEntryDTO dto = new InvestmentEntryDTO(
-                molde.getAccount().getId(),
-                InvestmentEntryType.DEPOSIT,
-                valor,
-                data,
-                "[RECORRENTE] " + molde.getDescription()
-            );
-            investmentService.lancarEntrada(dto,
-                molde.getUser() != null ? molde.getUser().getId() : molde.getAccount().getOwner().getId());
-            return null;
-        }
-
-        // Para demais contas: Transaction + Installment PENDING no checklist
         Transaction novaTransacao = new Transaction();
         novaTransacao.setDescription("[RECORRENTE] " + molde.getDescription());
         novaTransacao.setTotalAmount(valor);
         novaTransacao.setType(molde.getType());
         novaTransacao.setAccount(molde.getAccount());
+        novaTransacao.setDestinationAccount(molde.getDestinationAccount());
         novaTransacao.setCategory(molde.getCategory());
         novaTransacao.setPurchaseDate(data);
         novaTransacao.setSimulation(false);
@@ -226,16 +221,37 @@ public class RecurringTransactionService {
         if (rt.getDayOfMonth() < 1 || rt.getDayOfMonth() > 31) {
             throw new RuntimeException("O dia do mes deve ficar entre 1 e 31.");
         }
-        if (rt.getType() != TransactionType.EXPENSE && rt.getType() != TransactionType.INCOME) {
-            throw new RuntimeException("Recorrencias aceitam apenas entradas ou gastos.");
+        if (rt.getType() != TransactionType.EXPENSE
+                && rt.getType() != TransactionType.INCOME
+                && rt.getType() != TransactionType.TRANSFER) {
+            throw new RuntimeException("Recorrencias aceitam entrada, gasto ou transferencia.");
         }
     }
 
-    private void validarContaParaRecorrencia(TransactionType tipo, Account conta) {
+    private void validarContaParaRecorrencia(TransactionType tipo, Account conta, Account destino) {
         if (tipo == TransactionType.INCOME
                 && conta.getType() != AccountType.CASH
                 && conta.getType() != AccountType.CHECKING) {
             throw new RuntimeException("Entradas recorrentes devem cair em carteira ou conta corrente.");
+        }
+        if (tipo == TransactionType.EXPENSE && conta.getType() == AccountType.INVESTMENT) {
+            throw new RuntimeException("Gastos recorrentes nao podem sair diretamente de investimento.");
+        }
+        if (tipo == TransactionType.TRANSFER) {
+            if (destino == null) {
+                throw new RuntimeException("Transferencia recorrente exige conta de destino.");
+            }
+            if (conta.getId().equals(destino.getId())) {
+                throw new RuntimeException("Origem e destino devem ser contas diferentes.");
+            }
+            boolean origemCaixa = conta.getType() == AccountType.CASH || conta.getType() == AccountType.CHECKING;
+            boolean destinoValido = destino.getType() == AccountType.CASH
+                || destino.getType() == AccountType.CHECKING
+                || destino.getType() == AccountType.INVESTMENT;
+            if (!origemCaixa || !destinoValido) {
+                throw new RuntimeException(
+                    "Transferencias recorrentes podem sair de carteira/conta corrente para carteira, conta corrente ou investimento.");
+            }
         }
     }
 

@@ -1,10 +1,13 @@
 package com.evely.financas.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.evely.financas.dto.InvestmentEntryDTO;
 import com.evely.financas.enums.AccountType;
+import com.evely.financas.enums.InvestmentEntryType;
 import com.evely.financas.model.Account;
 import com.evely.financas.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
@@ -59,7 +62,18 @@ public class BalanceService {
     @Transactional
     public void transferir(Account origem, Account destino, BigDecimal valor, UUID userId) {
         baixarSaldo(origem, valor);
-        subirSaldo(destino, valor);
+        if (destino.getType() == AccountType.INVESTMENT) {
+            UUID operadorId = userId != null ? userId : origem.getOwner().getId();
+            investmentService.lancarEntrada(new InvestmentEntryDTO(
+                destino.getId(),
+                InvestmentEntryType.DEPOSIT,
+                valor,
+                LocalDate.now(),
+                "Transferencia de " + origem.getName()
+            ), operadorId);
+        } else {
+            subirSaldo(destino, valor);
+        }
 
         if (userId != null) {
             auditService.log(

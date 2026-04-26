@@ -109,8 +109,9 @@ public class InvestmentProjectionService {
     private BigDecimal somarAportesRecorrentes(UUID userId, UUID accountId) {
         return recurringRepository.findByUserId(userId)
             .stream()
-            .filter(rt -> rt.getAccount().getId().equals(accountId))
-            .filter(rt -> rt.getAccount().getType() == AccountType.INVESTMENT)
+            .filter(rt -> rt.getDestinationAccount() != null)
+            .filter(rt -> rt.getDestinationAccount().getId().equals(accountId))
+            .filter(rt -> rt.getDestinationAccount().getType() == AccountType.INVESTMENT)
             .map(rt -> rt.getEstimatedAmount() != null ? rt.getEstimatedAmount() : BigDecimal.ZERO)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
