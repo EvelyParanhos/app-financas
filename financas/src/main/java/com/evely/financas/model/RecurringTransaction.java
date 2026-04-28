@@ -3,6 +3,8 @@ package com.evely.financas.model;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import org.hibernate.type.SqlTypes;
 import com.evely.financas.enums.TransactionType;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -52,14 +54,17 @@ public class RecurringTransaction {
 
     @ManyToOne
     @JoinColumn(name = "account_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private Account account; 
 
     @ManyToOne
     @JoinColumn(name = "destination_account_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private Account destinationAccount;
 
     @ManyToOne
     @JoinColumn(name = "category_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private Category category;
 
     @Column(name = "is_variable")

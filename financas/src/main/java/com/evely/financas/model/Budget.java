@@ -3,6 +3,8 @@ package com.evely.financas.model;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import org.hibernate.type.SqlTypes;
 import com.evely.financas.enums.AlertStatus;
 import jakarta.persistence.*;
@@ -32,6 +34,7 @@ public class Budget {
 
     @ManyToOne
     @JoinColumn(name = "category_id", nullable = false)
+    @NotFound(action = NotFoundAction.IGNORE)
     private Category category;
 
     @Column(name = "amount_limit", nullable = false)

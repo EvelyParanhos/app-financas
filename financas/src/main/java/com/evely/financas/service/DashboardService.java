@@ -303,6 +303,7 @@ public class DashboardService {
     private BigDecimal calcularVirtualRecurrentes(UUID userId, LocalDate inicio, LocalDate fim, TransactionType tipo) {
         return recurringRepository.findByUserId(userId).stream()
             .filter(rt -> rt.getType() == tipo)
+            .filter(rt -> rt.getAccount() != null)
             .filter(rt -> tipo != TransactionType.TRANSFER
                 || (rt.getDestinationAccount() != null
                     && rt.getDestinationAccount().getType() == AccountType.INVESTMENT))
@@ -328,6 +329,7 @@ public class DashboardService {
             if (rt.getType() != TransactionType.EXPENSE
                     && rt.getType() != TransactionType.INCOME
                     && rt.getType() != TransactionType.TRANSFER) continue;
+            if (rt.getAccount() == null) continue;
 
             String descMaterializada = "[RECORRENTE] " + rt.getDescription();
             boolean jaMaterializada = transactionRepository.existsByDescriptionAndAccountIdAndPurchaseDateBetween(
@@ -414,14 +416,16 @@ public class DashboardService {
 
     private String nomeContaRecorrente(RecurringTransaction rt) {
         if (rt.getType() == TransactionType.TRANSFER && rt.getDestinationAccount() != null) {
-            return rt.getAccount().getName() + " -> " + rt.getDestinationAccount().getName();
+            String origem = rt.getAccount() != null ? rt.getAccount().getName() : "Conta removida";
+            return origem + " -> " + rt.getDestinationAccount().getName();
         }
         return rt.getAccount() != null ? rt.getAccount().getName() : null;
     }
 
     private String nomeContaRecorrente(Transaction t) {
         if (t.getType() == TransactionType.TRANSFER && t.getDestinationAccount() != null) {
-            return t.getAccount().getName() + " -> " + t.getDestinationAccount().getName();
+            String origem = t.getAccount() != null ? t.getAccount().getName() : "Conta removida";
+            return origem + " -> " + t.getDestinationAccount().getName();
         }
         return t.getAccount() != null ? t.getAccount().getName() : null;
     }

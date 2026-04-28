@@ -81,6 +81,10 @@ public class BudgetService {
         List<BudgetStatusDTO> listaStatus = new ArrayList<>();
 
         for (Budget budget : meusBudgets) {
+            if (budget.getCategory() == null) {
+                continue;
+            }
+
             UUID categoryId = budget.getCategory().getId();
 
             // 2. Usa a SUA query perfeita que soma as parcelas (Installment) do mês
@@ -129,6 +133,21 @@ public class BudgetService {
     // -------------------------------------------------------------------------
 
     private BudgetStatusDTO calcularStatus(Budget budget, UUID userId, int month, int year) {
+        if (budget.getCategory() == null) {
+            BigDecimal limite = budget.getAmountLimit() != null
+                ? budget.getAmountLimit()
+                : BigDecimal.ZERO;
+            return new BudgetStatusDTO(
+                budget.getId(),
+                "Categoria removida",
+                limite,
+                BigDecimal.ZERO,
+                limite,
+                0,
+                AlertStatus.OK
+            );
+        }
+
         BigDecimal gasto = budgetRepository.calcularGastoPorCategoria(
             userId,
             budget.getCategory().getId(),
