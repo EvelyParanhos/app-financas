@@ -50,6 +50,7 @@ public class TransactionService {
         return transactionRepository
             .findComFiltros(userId, month, year)  // sem os parâmetros de filtro
             .stream()
+            .filter(t -> !t.isSimulation())
             .filter(t -> type == null || t.getType() == type)
             .filter(t -> categoryId == null || (t.getCategory() != null && t.getCategory().getId().equals(categoryId)))
             .map(t -> new TransactionItemDTO(
@@ -135,7 +136,7 @@ public class TransactionService {
             return transacaoSalva;
         }
 
-        BigDecimal valorParcela = transacao.getTotalAmount()
+        BigDecimal valorParcelaBase = transacao.getTotalAmount()
             .divide(BigDecimal.valueOf(totalParcelas), 2, RoundingMode.HALF_UP);
 
         LocalDate dataBase = transacao.getPurchaseDate() != null
@@ -149,6 +150,11 @@ public class TransactionService {
             : dataBase;
 
         for (int i = 0; i < totalParcelas; i++) {
+            BigDecimal valorParcela = i == totalParcelas - 1
+                ? transacao.getTotalAmount()
+                    .subtract(valorParcelaBase.multiply(BigDecimal.valueOf(totalParcelas - 1)))
+                : valorParcelaBase;
+
             Installment parcela = new Installment();
             parcela.setInstallmentNumber(i + 1);
             parcela.setStatus(InstallmentStatus.PENDING);
@@ -179,15 +185,11 @@ public class TransactionService {
 
         Transaction transacaoSalva = transactionRepository.save(transacao);
 
-        if (!transacaoSalva.isSimulation()) {
-            if (ehCartao) {
-                balanceService.baixarSaldo(
-                    transacaoSalva.getAccount(),
-                    transacaoSalva.getTotalAmount()
-                );
-            } else if (!isMaterializacaoRecorrente(transacaoSalva)) {
-                liquidarParcelasDeCaixa(transacaoSalva);
-            }
+        // RN02: compra no cartao compoe a fatura, mas nao reduz saldo real agora.
+        if (!transacaoSalva.isSimulation()
+                && !ehCartao
+                && !isMaterializacaoRecorrente(transacaoSalva)) {
+            liquidarParcelasDeCaixa(transacaoSalva);
         }
 
         return transacaoSalva;
@@ -231,7 +233,6 @@ public class TransactionService {
                 parcela.setInvoice(invoice);
                 installmentRepository.save(parcela);
             }
-            balanceService.baixarSaldo(transacao.getAccount(), transacao.getTotalAmount());
 
         } else if (transacao.getType() == TransactionType.TRANSFER) {
             balanceService.transferir(
