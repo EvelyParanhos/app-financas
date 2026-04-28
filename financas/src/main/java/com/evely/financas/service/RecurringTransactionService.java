@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import com.evely.financas.enums.AccountType;
+import com.evely.financas.enums.InstallmentStatus;
 import com.evely.financas.enums.TransactionType;
 import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Account;
@@ -58,7 +59,11 @@ public class RecurringTransactionService {
         validarContaParaRecorrencia(rt.getType(), conta, destino);
         rt.setDestinationAccount(rt.getType() == TransactionType.TRANSFER ? destino : null);
 
-        return recurringRepository.save(rt);
+        RecurringTransaction salva = recurringRepository.save(rt);
+        if (rt.isAlreadyLiquidatedThisMonth()) {
+            materializarSilenciosamenteMesAtual(salva, user);
+        }
+        return salva;
     }
 
     public List<RecurringTransaction> listar(UUID userId) {
@@ -199,6 +204,42 @@ public class RecurringTransactionService {
 
         return transactionService.registrarTransacao(novaTransacao, 1,
             molde.getUser() != null ? molde.getUser().getId() : molde.getAccount().getOwner().getId());
+    }
+
+    private Transaction materializarSilenciosamenteMesAtual(RecurringTransaction molde, User user) {
+        LocalDate hoje = LocalDate.now();
+        LocalDate inicioMes = hoje.withDayOfMonth(1);
+        LocalDate fimMes = inicioMes.withDayOfMonth(inicioMes.lengthOfMonth());
+
+        if (jaMaterializadaNoPeriodo(molde, inicioMes, fimMes)) {
+            throw new RuntimeException(
+                "Esta transacao recorrente ja foi registrada para o mes atual.");
+        }
+
+        int diaDoMes = Math.min(molde.getDayOfMonth(), YearMonth.from(hoje).lengthOfMonth());
+        LocalDate data = LocalDate.of(hoje.getYear(), hoje.getMonthValue(), diaDoMes);
+        BigDecimal valor = resolverValor(molde, null);
+
+        Transaction transacao = new Transaction();
+        transacao.setDescription("[RECORRENTE] " + molde.getDescription());
+        transacao.setTotalAmount(valor);
+        transacao.setType(molde.getType());
+        transacao.setAccount(molde.getAccount());
+        transacao.setDestinationAccount(molde.getDestinationAccount());
+        transacao.setCategory(molde.getCategory());
+        transacao.setPurchaseDate(data);
+        transacao.setSimulation(false);
+
+        Installment parcela = new Installment();
+        parcela.setInstallmentNumber(1);
+        parcela.setAmount(valor);
+        parcela.setDueDate(data);
+        parcela.setStatus(InstallmentStatus.PAID);
+        parcela.setPayer(user);
+        parcela.setTransaction(transacao);
+        transacao.getInstallments().add(parcela);
+
+        return transactionRepository.save(transacao);
     }
 
     private void validarDono(RecurringTransaction rt, UUID userId) {

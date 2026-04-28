@@ -298,6 +298,7 @@ function RecorrentesTab() {
   const [form, setForm]               = useState({
     description: '', estimatedAmount: 0, dayOfMonth: '',
     type: 'EXPENSE', isVariable: false, accountId: '', destinationAccountId: '',
+    alreadyLiquidatedThisMonth: false,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
@@ -317,7 +318,11 @@ function RecorrentesTab() {
   useEffect(() => { load() }, [])
 
   const reset = () => {
-    setForm({ description: '', estimatedAmount: 0, dayOfMonth: '', type: 'EXPENSE', isVariable: false, accountId: '', destinationAccountId: '' })
+    setForm({
+      description: '', estimatedAmount: 0, dayOfMonth: '',
+      type: 'EXPENSE', isVariable: false, accountId: '', destinationAccountId: '',
+      alreadyLiquidatedThisMonth: false,
+    })
     setEditItem(null); setShowForm(false); setError('')
   }
 
@@ -339,6 +344,7 @@ function RecorrentesTab() {
         dayOfMonth:      parseInt(form.dayOfMonth) || 1,
         type:            form.type,
         isVariable:      form.isVariable,
+        alreadyLiquidatedThisMonth: !editItem && form.alreadyLiquidatedThisMonth,
         account:         { id: form.accountId },
       }
       if (form.type === 'TRANSFER') {
@@ -367,6 +373,7 @@ function RecorrentesTab() {
       isVariable:      rec.isVariable || false,
       accountId:       rec.account?.id || '',
       destinationAccountId: rec.destinationAccount?.id || '',
+      alreadyLiquidatedThisMonth: false,
     })
     setShowForm(true)
     setError('')
@@ -499,6 +506,21 @@ function RecorrentesTab() {
                 }} />
               </div>
               Valor variável (ex: conta de luz)
+            </label>
+          )}
+
+          {!editItem && (
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              cursor: 'pointer', fontSize: 13, color: 'var(--text-secondary)',
+            }}>
+              <input
+                type="checkbox"
+                checked={form.alreadyLiquidatedThisMonth}
+                onChange={e => setForm(f => ({ ...f, alreadyLiquidatedThisMonth: e.target.checked }))}
+                style={{ width: 16, height: 16, accentColor: 'var(--lime)' }}
+              />
+              Já liquidado neste mês
             </label>
           )}
 
