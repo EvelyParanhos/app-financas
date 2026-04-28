@@ -217,11 +217,15 @@ public class TransactionService {
             transacao.setDestinationAccount(destino);
         }
 
+        protegerFluxoFechadoAoEfetivarSimulacao(transacao);
+
         boolean ehCartao = conta.getType() == AccountType.CREDIT_CARD;
         transacao.setSimulation(false);
 
         if (ehCartao) {
-            balanceService.validarSaldo(transacao.getAccount(), transacao.getTotalAmount());
+            if (conta.getCardLimit() != null && conta.getCardLimit().compareTo(BigDecimal.ZERO) > 0) {
+                balanceService.validarSaldo(transacao.getAccount(), transacao.getTotalAmount());
+            }
             for (Installment parcela : transacao.getInstallments()) {
                 LocalDate mesDaParcela = parcela.getDueDate().withDayOfMonth(1);
                 CreditCardInvoice invoice = creditCardInvoiceService.buscarOuCriarFatura(
@@ -278,6 +282,25 @@ public class TransactionService {
     private boolean isMaterializacaoRecorrente(Transaction transacao) {
         return transacao.getDescription() != null
             && transacao.getDescription().startsWith("[RECORRENTE]");
+    }
+
+    private void protegerFluxoFechadoAoEfetivarSimulacao(Transaction transacao) {
+        LocalDate hoje = LocalDate.now();
+        LocalDate dataCompra = transacao.getPurchaseDate();
+        if (dataCompra == null) {
+            transacao.setPurchaseDate(hoje);
+            return;
+        }
+
+        LocalDate inicioMesAtual = hoje.withDayOfMonth(1);
+        if (!dataCompra.withDayOfMonth(1).isBefore(inicioMesAtual)) {
+            return;
+        }
+
+        transacao.setPurchaseDate(hoje);
+        for (Installment parcela : transacao.getInstallments()) {
+            parcela.setDueDate(hoje);
+        }
     }
 
     private void liquidarParcelasDeCaixa(Transaction transacao) {

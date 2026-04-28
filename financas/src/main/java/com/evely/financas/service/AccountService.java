@@ -2,16 +2,20 @@ package com.evely.financas.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import com.evely.financas.enums.AccountType;
+import com.evely.financas.enums.InvoiceStatus;
 import com.evely.financas.enums.InvestmentEntryType;
 import com.evely.financas.exception.ObjectNotFoundException;
 import com.evely.financas.model.Account;
+import com.evely.financas.model.CreditCardInvoice;
 import com.evely.financas.model.InvestmentEntry;
 import com.evely.financas.repository.AccountRepository;
+import com.evely.financas.repository.CreditCardInvoiceRepository;
 import com.evely.financas.repository.InvestmentEntryRepository;
 import com.evely.financas.repository.PartnershipRepository;
 import com.evely.financas.repository.UserRepository;
@@ -26,6 +30,7 @@ public class AccountService {
     private final UserRepository userRepository;
     private final InvestmentEntryRepository investmentEntryRepository;
     private final PartnershipRepository partnershipRepository;
+    private final CreditCardInvoiceRepository creditCardInvoiceRepository;
 
     @Transactional
     public Account salvar(Account account) {
@@ -37,8 +42,8 @@ public class AccountService {
                 "Não foi possível criar a conta: Usuário dono não encontrado!"));
 
         if (account.getType() == AccountType.CREDIT_CARD) {
-            if (account.getCardLimit() == null || account.getCardLimit().compareTo(BigDecimal.ZERO) <= 0) {
-                throw new RuntimeException("Cartão de crédito exige um limite maior que zero.");
+            if (account.getCardLimit() != null && account.getCardLimit().compareTo(BigDecimal.ZERO) < 0) {
+                throw new RuntimeException("O limite do cartao nao pode ser negativo.");
             }
             if (account.getClosingDay() == null || account.getDueDay() == null) {
                 throw new RuntimeException("Cartão de crédito exige dia de fechamento e vencimento.");
@@ -48,7 +53,11 @@ public class AccountService {
         Account salva = accountRepository.save(account);
 
         if (salva.getType() == AccountType.CREDIT_CARD) {
-            accountRepository.setBalance(salva.getId(), salva.getCardLimit());
+            accountRepository.setBalance(
+                salva.getId(),
+                salva.getCardLimit() != null ? salva.getCardLimit() : BigDecimal.ZERO
+            );
+            criarFaturaInicialAberta(salva, account.getInitialOpenInvoiceAmount());
         } else {
             BigDecimal saldoInicial = account.getInitialBalance() != null
                 ? account.getInitialBalance()
@@ -68,6 +77,31 @@ public class AccountService {
         }
 
         return salva;
+    }
+
+    private void criarFaturaInicialAberta(Account conta, BigDecimal valorAberto) {
+        if (valorAberto == null || valorAberto.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        YearMonth referencia = YearMonth.now();
+        int diaFechamento = Math.min(conta.getClosingDay(), referencia.lengthOfMonth());
+        LocalDate fechamento = referencia.atDay(diaFechamento);
+
+        YearMonth vencimento = referencia.plusMonths(1);
+        int diaVencimento = Math.min(conta.getDueDay(), vencimento.lengthOfMonth());
+
+        CreditCardInvoice invoice = new CreditCardInvoice();
+        invoice.setAccount(conta);
+        invoice.setReferenceMonth(referencia.getMonthValue());
+        invoice.setReferenceYear(referencia.getYear());
+        invoice.setClosingDate(fechamento);
+        invoice.setDueDate(vencimento.atDay(diaVencimento));
+        invoice.setTotalAmount(valorAberto);
+        invoice.setPaidAmount(BigDecimal.ZERO);
+        invoice.setStatus(InvoiceStatus.OPEN);
+
+        creditCardInvoiceRepository.save(invoice);
     }
 
     @Transactional

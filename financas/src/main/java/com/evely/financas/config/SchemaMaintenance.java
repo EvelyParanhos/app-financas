@@ -32,10 +32,22 @@ public class SchemaMaintenance {
             "ALTER TABLE accounts ADD COLUMN is_active boolean NOT NULL DEFAULT true"
         );
         executeIgnoringFailure(
+            "ALTER TABLE accounts MODIFY COLUMN is_active boolean NOT NULL DEFAULT true"
+        );
+        executeIgnoringFailure(
+            "ALTER TABLE accounts MODIFY COLUMN active boolean NULL DEFAULT true"
+        );
+        executeIgnoringFailure(
             "ALTER TABLE categories ADD COLUMN is_active boolean NOT NULL DEFAULT true"
         );
         executeIgnoringFailure(
+            "ALTER TABLE categories MODIFY COLUMN is_active boolean NOT NULL DEFAULT true"
+        );
+        executeIgnoringFailure(
             "UPDATE categories SET is_active = active WHERE active IS NOT NULL"
+        );
+        executeIgnoringFailure(
+            "ALTER TABLE categories MODIFY COLUMN active boolean NULL DEFAULT true"
         );
     }
 

@@ -81,4 +81,7 @@ public class Account {
      */
     @Transient
     private BigDecimal initialBalance;
+
+    @Transient
+    private BigDecimal initialOpenInvoiceAmount;
 }
