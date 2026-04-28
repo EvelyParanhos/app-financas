@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 
 /**
  * PIX-style currency input — Brazilian R$ format
@@ -17,6 +17,10 @@ export default function CurrencyInput({
   // Store as integer cents internally
   const [cents, setCents] = useState(() => Math.round((value || 0) * 100))
   const inputRef = useRef(null)
+
+  useEffect(() => {
+    setCents(Math.round((Number(value) || 0) * 100))
+  }, [value])
 
   const format = (c) => {
     const str = String(c).padStart(3, '0')

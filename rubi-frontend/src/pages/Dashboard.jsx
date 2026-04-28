@@ -148,7 +148,7 @@ export default function Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', overflow: 'hidden' }}>
 
         {/* ── LEFT ── */}
-        <div style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'relative', overflow: 'visible', display: 'flex', flexDirection: 'column' }}>
 
           {/* Cards — sem borderRadius, fundo sólido, sem linha de destaque */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, borderBottom: '1px solid var(--border)' }}>

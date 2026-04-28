@@ -38,6 +38,7 @@ export default function Loans() {
   const [loading,    setLoading]    = useState(true)
   const [showNew,    setShowNew]    = useState(false)
   const [receiveId,  setReceiveId]  = useState(null)
+  const [error,      setError]      = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -48,7 +49,10 @@ export default function Loans() {
       ])
       setLoans(l || [])
       setAccounts(a || [])
-    } catch { setLoans([]) }
+    } catch (err) {
+      setLoans([])
+      setError(err.response?.data?.message || 'Erro inesperado')
+    }
     finally { setLoading(false) }
   }
 
@@ -56,7 +60,7 @@ export default function Loans() {
 
   const forgive = async (id) => {
     if (!confirm('Perdoar este empréstimo? O valor será dado como não-cobrado.')) return
-    try { await loansAPI.forgive(id); load() } catch {}
+    try { await loansAPI.forgive(id); load() } catch (err) { setError(err.response?.data?.message || 'Erro inesperado') }
   }
 
   const external  = loans.filter(l => !l.selfLoan)
@@ -83,6 +87,8 @@ export default function Loans() {
       </div>
 
       <div className="scrollable" style={{ flex: 1, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {error && <FormError>{error}</FormError>}
+
         {/* Empréstimos externos */}
         <Section title="Emprestei para alguém" empty={external.length === 0} emptyMsg="Nenhum empréstimo externo ativo">
           {external.map(loan => (
@@ -274,20 +280,19 @@ function NewLoanModal({ accounts, onClose, onSaved }) {
   }
 
   return (
-    <>
-      <div onClick={onClose} style={{
+    <div onClick={onClose} style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
         backdropFilter: 'blur(4px)', zIndex: 100,
-      }} />
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24,
+      }}>
 
-      <div style={{
-        position: 'fixed', top: '50%', left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: '100%', maxWidth: 460,
+      <div onClick={e => e.stopPropagation()} style={{
+        width: 'min(460px, calc(100vw - 32px))',
         background: 'var(--bg-raised)', border: '1px solid var(--border)',
-        borderRadius: 16, overflow: 'hidden', zIndex: 101,
+        borderRadius: 16, overflow: 'hidden',
         animation: 'fadeUp 0.25s var(--ease) both',
-        maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+        maxHeight: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column',
       }}>
         {/* Header */}
         <div style={{
@@ -418,7 +423,7 @@ function NewLoanModal({ accounts, onClose, onSaved }) {
           </Button>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -437,17 +442,16 @@ function ReceiveModal({ loanId, loan, onClose, onSaved }) {
   }
 
   return (
-    <>
-      <div onClick={onClose} style={{
+    <div onClick={onClose} style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
         backdropFilter: 'blur(4px)', zIndex: 102,
-      }} />
-      <div style={{
-        position: 'fixed', top: '50%', left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: '100%', maxWidth: 360,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24,
+      }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: 'min(360px, calc(100vw - 32px))',
         background: 'var(--bg-raised)', border: '1px solid var(--border)',
-        borderRadius: 16, overflow: 'hidden', zIndex: 103,
+        borderRadius: 16, overflow: 'hidden',
         animation: 'fadeUp 0.2s var(--ease) both',
       }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
@@ -473,6 +477,6 @@ function ReceiveModal({ loanId, loan, onClose, onSaved }) {
           </Button>
         </div>
       </div>
-    </>
+    </div>
   )
 }

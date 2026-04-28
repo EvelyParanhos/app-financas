@@ -110,7 +110,7 @@ function ContasTab() {
   const [error, setError]       = useState('')
 
   const load = async () => {
-    try { const { data } = await accountsAPI.list(false); setAccounts(data || []) } catch {}
+    try { const { data } = await accountsAPI.list(false); setAccounts(data || []) } catch (err) { setError(err.response?.data?.message || 'Erro inesperado') }
   }
   useEffect(() => { load() }, [])
 
@@ -139,11 +139,11 @@ function ContasTab() {
 
   const del = async (id) => {
     if (!confirm('Excluir esta conta?')) return
-    try { await accountsAPI.delete(id); load() } catch {}
+    try { await accountsAPI.delete(id); load() } catch (err) { setError(err.response?.data?.message || 'Erro inesperado') }
   }
 
   const toggleShared = async (id) => {
-    try { await accountsAPI.toggleVisibility(id); load() } catch {}
+    try { await accountsAPI.toggleVisibility(id); load() } catch (err) { setError(err.response?.data?.message || 'Erro inesperado') }
   }
 
   return (
@@ -296,7 +296,7 @@ function RecorrentesTab() {
   const [showForm, setShowForm]       = useState(false)
   const [editItem, setEditItem]       = useState(null)
   const [form, setForm]               = useState({
-    description: '', estimatedAmount: '', dayOfMonth: '',
+    description: '', estimatedAmount: 0, dayOfMonth: '',
     type: 'EXPENSE', isVariable: false, accountId: '', destinationAccountId: '',
   })
   const [loading, setLoading] = useState(false)
@@ -310,12 +310,14 @@ function RecorrentesTab() {
       ])
       setRecorrentes(recs || [])
       setAccounts(accs || [])
-    } catch {}
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erro inesperado')
+    }
   }
   useEffect(() => { load() }, [])
 
   const reset = () => {
-    setForm({ description: '', estimatedAmount: '', dayOfMonth: '', type: 'EXPENSE', isVariable: false, accountId: '', destinationAccountId: '' })
+    setForm({ description: '', estimatedAmount: 0, dayOfMonth: '', type: 'EXPENSE', isVariable: false, accountId: '', destinationAccountId: '' })
     setEditItem(null); setShowForm(false); setError('')
   }
 
@@ -333,7 +335,7 @@ function RecorrentesTab() {
     try {
       const payload = {
         description:     form.description.trim(),
-        estimatedAmount: parseFloat(form.estimatedAmount),
+        estimatedAmount: form.estimatedAmount,
         dayOfMonth:      parseInt(form.dayOfMonth) || 1,
         type:            form.type,
         isVariable:      form.isVariable,
@@ -352,14 +354,14 @@ function RecorrentesTab() {
 
   const del = async (id) => {
     if (!confirm('Excluir esta transação recorrente?')) return
-    try { await recurringAPI.delete(id); load() } catch {}
+    try { await recurringAPI.delete(id); load() } catch (err) { setError(err.response?.data?.message || 'Erro inesperado') }
   }
 
   const startEdit = (rec) => {
     setEditItem(rec)
     setForm({
       description:     rec.description,
-      estimatedAmount: String(rec.estimatedAmount),
+      estimatedAmount: Number(rec.estimatedAmount || 0),
       dayOfMonth:      String(rec.dayOfMonth),
       type:            rec.type,
       isVariable:      rec.isVariable || false,
@@ -434,14 +436,12 @@ function RecorrentesTab() {
                 onBlur={e => e.target.style.borderColor = 'var(--border)'}
               />
             </Field>
-            <Field label="Valor (R$)" htmlFor="rec-val">
-              <input id="rec-val" type="number" value={form.estimatedAmount}
-                onChange={e => setForm(f => ({ ...f, estimatedAmount: e.target.value }))}
-                placeholder="0,00" min="0" step="0.01" style={fieldInputStyle}
-                onFocus={e => e.target.style.borderColor = 'var(--lime)'}
-                onBlur={e => e.target.style.borderColor = 'var(--border)'}
-              />
-            </Field>
+            <CurrencyInput
+              value={form.estimatedAmount}
+              onChange={v => setForm(f => ({ ...f, estimatedAmount: v }))}
+              label="Valor"
+              id="rec-val"
+            />
             <Field label="Dia do mês" htmlFor="rec-day">
               <input id="rec-day" type="number" value={form.dayOfMonth}
                 onChange={e => setForm(f => ({ ...f, dayOfMonth: e.target.value }))}
@@ -605,7 +605,7 @@ function CategoriasTab() {
   const [error, setError]           = useState('')
 
   const load = async () => {
-    try { const { data } = await categoriesAPI.list(); setCategories((data || []).filter(c => c.active !== false)) } catch {}
+    try { const { data } = await categoriesAPI.list(); setCategories((data || []).filter(c => c.active !== false)) } catch (err) { setError(err.response?.data?.message || 'Erro inesperado') }
   }
   useEffect(() => { load() }, [])
 
@@ -623,7 +623,7 @@ function CategoriasTab() {
   }
 
   const del = async (id) => {
-    try { await categoriesAPI.delete(id); load() } catch {}
+    try { await categoriesAPI.delete(id); load() } catch (err) { setError(err.response?.data?.message || 'Erro inesperado') }
   }
 
   const expense = categories.filter(c => c.type === 'EXPENSE')

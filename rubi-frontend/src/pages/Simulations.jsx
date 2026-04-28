@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { FlaskConical, Plus, Zap } from 'lucide-react'
 import { transactionsAPI } from '../services/api'
-import { Button, Badge } from '../components/ui/FormElements'
+import { Button, Badge, FormError } from '../components/ui/FormElements'
 import NewSimulationModal from '../components/dashboard/NewSimulationModal'
 
 const fmt = (n) => 'R$ ' + Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
@@ -15,6 +15,7 @@ export default function Simulations() {
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
   const [backendOk, setBackendOk] = useState(true)
+  const [error, setError] = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -33,12 +34,14 @@ export default function Simulations() {
   useEffect(() => { load() }, [month, year])
 
   const activate = async (id) => {
-    try { await transactionsAPI.activate(id); load() } catch {}
+    setError('')
+    try { await transactionsAPI.activate(id); load() } catch (err) { setError(err.response?.data?.message || 'Erro inesperado') }
   }
 
   const del = async (id) => {
     if (!confirm('Excluir esta simulação?')) return
-    try { await transactionsAPI.delete(id); load() } catch {}
+    setError('')
+    try { await transactionsAPI.delete(id); load() } catch (err) { setError(err.response?.data?.message || 'Erro inesperado') }
   }
 
   return (
@@ -120,6 +123,8 @@ public List<TransactionItemDTO> listarSimulacoes(UUID userId, int month, int yea
 }`}</pre>
           </div>
         )}
+
+        {error && <FormError>{error}</FormError>}
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>
