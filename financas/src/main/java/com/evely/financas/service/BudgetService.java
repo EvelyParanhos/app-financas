@@ -28,7 +28,7 @@ public class BudgetService {
     @Transactional
     public Budget criar(BudgetDTO dto, User owner) {
         // Garante que a categoria pertence ao usuário logado
-        Category category = categoryRepository.findById(dto.categoryId())
+        Category category = categoryRepository.findByIdAndActiveTrue(dto.categoryId())
             .orElseThrow(() -> new ObjectNotFoundException("Categoria não encontrada"));
 
         if (!category.getOwner().getId().equals(owner.getId())) {

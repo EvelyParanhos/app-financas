@@ -2,6 +2,7 @@ package com.evely.financas.repository;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -13,9 +14,17 @@ import com.evely.financas.model.Account;
 @Repository
 public interface AccountRepository extends JpaRepository<Account, UUID> {
 
-    List<Account> findByOwnerId(UUID userId);
+    @Override
+    @Query("SELECT a FROM Account a WHERE a.active = true")
+    List<Account> findAll();
 
-    List<Account> findByOwnerIdAndSharedTrue(UUID userId);
+    Optional<Account> findByIdAndActiveTrue(UUID id);
+
+    @Query("SELECT a FROM Account a WHERE a.owner.id = :userId AND a.active = true")
+    List<Account> findByOwnerId(@Param("userId") UUID userId);
+
+    @Query("SELECT a FROM Account a WHERE a.owner.id = :userId AND a.shared = true AND a.active = true")
+    List<Account> findByOwnerIdAndSharedTrue(@Param("userId") UUID userId);
 
     // =========================================================
     // ✅ NOVO: Updates atômicos de saldo

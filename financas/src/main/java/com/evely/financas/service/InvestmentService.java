@@ -41,7 +41,7 @@ public class InvestmentService {
      */
     @Transactional
     public InvestmentEntry lancarEntrada(InvestmentEntryDTO dto, UUID userId) {
-        Account account = accountRepository.findById(dto.accountId())
+        Account account = accountRepository.findByIdAndActiveTrue(dto.accountId())
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
 
         if (account.getType() != AccountType.INVESTMENT) {
@@ -74,7 +74,7 @@ public class InvestmentService {
     // =========================================================
 
     public InvestmentSummaryDTO getResumo(UUID accountId, UUID userId) {
-        Account account = accountRepository.findById(accountId)
+        Account account = accountRepository.findByIdAndActiveTrue(accountId)
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
 
         validarAcessoInvestimento(account, userId);
@@ -116,7 +116,7 @@ public class InvestmentService {
     // =========================================================
 
     public List<InvestmentEntry> getHistorico(UUID accountId, UUID userId) {
-        Account account = accountRepository.findById(accountId)
+        Account account = accountRepository.findByIdAndActiveTrue(accountId)
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
         validarAcessoInvestimento(account, userId);
         return entryRepository.findByAccountIdOrderByEntryDateDesc(accountId);

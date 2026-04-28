@@ -1,6 +1,7 @@
 package com.evely.financas.repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -12,7 +13,13 @@ import com.evely.financas.model.User;
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, UUID> {
 
+    @Override
+    @Query("SELECT c FROM Category c WHERE c.active = true")
+    List<Category> findAll();
+
     List<Category> findByOwnerAndActiveTrue(User owner);
+
+    Optional<Category> findByIdAndActiveTrue(UUID id);
 
     /**
      * Versão por UUID — evita buscar o User inteiro só para listar categorias.

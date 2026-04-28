@@ -39,7 +39,7 @@ public class LoanService {
         User lender = userRepository.findById(lenderId)
             .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado"));
 
-        Account sourceAccount = accountRepository.findById(dto.sourceAccountId())
+        Account sourceAccount = accountRepository.findByIdAndActiveTrue(dto.sourceAccountId())
             .orElseThrow(() -> new ObjectNotFoundException("Conta de origem não encontrada"));
 
         balanceService.validarSaldo(sourceAccount, dto.totalAmount());
@@ -143,10 +143,10 @@ public class LoanService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ObjectNotFoundException("Usuário não encontrado"));
 
-        Account sourceAccount = accountRepository.findById(dto.sourceAccountId())
+        Account sourceAccount = accountRepository.findByIdAndActiveTrue(dto.sourceAccountId())
             .orElseThrow(() -> new ObjectNotFoundException("Conta de origem não encontrada"));
 
-        Account targetAccount = accountRepository.findById(dto.targetAccountId())
+        Account targetAccount = accountRepository.findByIdAndActiveTrue(dto.targetAccountId())
             .orElseThrow(() -> new ObjectNotFoundException("Conta de destino não encontrada"));
 
         if (sourceAccount.getId().equals(targetAccount.getId())) {

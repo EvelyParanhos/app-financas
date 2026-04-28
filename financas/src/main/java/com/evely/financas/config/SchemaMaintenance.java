@@ -28,6 +28,15 @@ public class SchemaMaintenance {
         executeIgnoringFailure(
             "ALTER TABLE transactions MODIFY COLUMN type varchar(30) NULL"
         );
+        executeIgnoringFailure(
+            "ALTER TABLE accounts ADD COLUMN is_active boolean NOT NULL DEFAULT true"
+        );
+        executeIgnoringFailure(
+            "ALTER TABLE categories ADD COLUMN is_active boolean NOT NULL DEFAULT true"
+        );
+        executeIgnoringFailure(
+            "UPDATE categories SET is_active = active WHERE active IS NOT NULL"
+        );
     }
 
     private void executeIgnoringFailure(String sql) {

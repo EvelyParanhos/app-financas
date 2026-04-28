@@ -53,7 +53,7 @@ public class AccountController {
     public ResponseEntity<Void> excluir(
             @PathVariable UUID id,
             @AuthenticationPrincipal User user) {
-        Account conta = accountRepository.findById(id)
+        Account conta = accountRepository.findByIdAndActiveTrue(id)
             .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
         if (!conta.getOwner().getId().equals(user.getId()))
             throw new RuntimeException("Sem permissão para excluir esta conta.");
@@ -66,7 +66,7 @@ public class AccountController {
             @PathVariable UUID id,
             @RequestBody Account account,
             @AuthenticationPrincipal User user) {
-        Account existente = accountRepository.findById(id)
+        Account existente = accountRepository.findByIdAndActiveTrue(id)
             .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
         if (!existente.getOwner().getId().equals(user.getId()))
             throw new RuntimeException("Sem permissão para editar esta conta.");
@@ -77,7 +77,7 @@ public class AccountController {
     public ResponseEntity<Void> toggleVisibility(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal User user) {
-        Account conta = accountRepository.findById(accountId)
+        Account conta = accountRepository.findByIdAndActiveTrue(accountId)
             .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
         if (!conta.getOwner().getId().equals(user.getId()))
             throw new RuntimeException("Sem permissão.");

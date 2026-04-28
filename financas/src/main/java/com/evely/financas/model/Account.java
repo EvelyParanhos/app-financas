@@ -53,6 +53,9 @@ public class Account {
     @Column(name = "is_shared")
     private boolean shared;
 
+    @Column(name = "is_active", nullable = false)
+    private boolean active = true;
+
     /**
      * ✅ NOVO: Saldo atual da conta — fonte única de verdade para CHECKING, CASH e CREDIT_CARD.
      *

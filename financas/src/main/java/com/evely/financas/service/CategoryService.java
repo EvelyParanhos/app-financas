@@ -52,7 +52,7 @@ public class CategoryService {
     }
 
     public void softDelete(UUID categoryId, User currentUser) {
-        Category category = categoryRepository.findById(categoryId)
+        Category category = categoryRepository.findByIdAndActiveTrue(categoryId)
             .orElseThrow(() -> new ObjectNotFoundException("Categoria não encontrada"));
         validarDono(category, currentUser);
         category.setActive(false);
@@ -60,7 +60,7 @@ public class CategoryService {
     }
 
     public Category atualizar(UUID id, CategoryDTO dto, User currentUser) {
-        Category categoria = categoryRepository.findById(id)
+        Category categoria = categoryRepository.findByIdAndActiveTrue(id)
             .orElseThrow(() -> new ObjectNotFoundException("Categoria não encontrada"));
         validarDono(categoria, currentUser);
         categoria.setName(dto.name());

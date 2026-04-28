@@ -33,6 +33,7 @@ public class Category {
     @JoinColumn(name = "user_id")
     private User owner;
 
+    @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
     private String name;

@@ -30,6 +30,7 @@ public class AccountService {
     @Transactional
     public Account salvar(Account account) {
         UUID ownerId = account.getOwner().getId();
+        account.setActive(true);
 
         userRepository.findById(ownerId)
             .orElseThrow(() -> new ObjectNotFoundException(
@@ -71,7 +72,7 @@ public class AccountService {
 
     @Transactional
     public void definirSaldoInicial(UUID accountId, BigDecimal novoSaldo, UUID userId) {
-        Account conta = accountRepository.findById(accountId)
+        Account conta = accountRepository.findByIdAndActiveTrue(accountId)
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
 
         if (!conta.getOwner().getId().equals(userId)) {
@@ -93,7 +94,7 @@ public class AccountService {
     }
 
     public Account buscarContaComAcessoPermitido(UUID accountId, UUID userId) {
-        Account conta = accountRepository.findById(accountId)
+        Account conta = accountRepository.findByIdAndActiveTrue(accountId)
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
 
         if (conta.getOwner().getId().equals(userId)) return conta;
@@ -135,12 +136,17 @@ public class AccountService {
         return Stream.concat(minhas.stream(), doParceiroShared.stream()).toList();
     }
 
+    @Transactional
     public void excluir(UUID id) {
-        accountRepository.deleteById(id);
+        Account conta = accountRepository.findById(id)
+            .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
+        conta.setActive(false);
+        accountRepository.save(conta);
     }
 
+    @Transactional
     public Account editar(UUID id, Account accountAtualizada) {
-        Account accountExistente = accountRepository.findById(id)
+        Account accountExistente = accountRepository.findByIdAndActiveTrue(id)
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada com o ID: " + id));
 
         accountExistente.setName(accountAtualizada.getName());
