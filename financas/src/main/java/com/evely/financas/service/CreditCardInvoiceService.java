@@ -72,7 +72,12 @@ public class CreditCardInvoiceService {
 
     @Transactional
     public void adicionarValorNaFatura(CreditCardInvoice invoice, BigDecimal valor) {
-        invoice.setTotalAmount(invoice.getTotalAmount().add(valor));
+        if (valor == null || valor.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("O valor da compra no cartao deve ser maior que zero.");
+        }
+
+        consumirLimiteDoCartao(invoice.getAccount(), valor);
+        invoice.setTotalAmount(safe(invoice.getTotalAmount()).add(valor));
         invoiceRepository.save(invoice);
     }
 
@@ -157,12 +162,27 @@ public class CreditCardInvoiceService {
     }
 
     private void devolverLimiteAoCartao(Account account, BigDecimal valor) {
-        accountRepository.incrementBalance(account.getId(), valor);
-        accountRepository.findById(account.getId()).ifPresent(acc -> {
-            if (acc.getCardLimit() != null && acc.getBalance().compareTo(acc.getCardLimit()) > 0) {
-                accountRepository.setBalance(acc.getId(), acc.getCardLimit());
-            }
-        });
+        int updated = accountRepository.restoreCreditLimit(account.getId(), valor);
+        if (updated == 0) {
+            throw new RuntimeException("Nao foi possivel devolver o limite disponivel do cartao.");
+        }
+    }
+
+    private void consumirLimiteDoCartao(Account account, BigDecimal valor) {
+        int updated = accountRepository.consumeCreditLimit(account.getId(), valor);
+        if (updated > 0) {
+            return;
+        }
+
+        Account atual = accountRepository.findById(account.getId()).orElse(account);
+        BigDecimal disponivel = atual.getBalance() != null ? atual.getBalance() : BigDecimal.ZERO;
+        throw new RuntimeException(
+            "Limite insuficiente no cartao: " + atual.getName()
+                + ". Disponivel: R$" + disponivel + ", necessario: R$" + valor);
+    }
+
+    private BigDecimal safe(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     public List<CreditCardInvoice> listarFaturasDoCartao(UUID accountId) {

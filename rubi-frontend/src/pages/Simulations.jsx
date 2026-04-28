@@ -158,7 +158,8 @@ public List<TransactionItemDTO> listarSimulacoes(UUID userId, int month, int yea
       {showNew && (
         <NewSimulationModal
           onClose={() => setShowNew(false)}
-          onSaved={() => { setShowNew(false); load() }}
+          onSaved={() => setShowNew(false)}
+          onSuccess={load}
           month={month} year={year}
         />
       )}

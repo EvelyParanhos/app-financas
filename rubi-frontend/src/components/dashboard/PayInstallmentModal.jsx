@@ -16,7 +16,7 @@ function kindOf(item) {
   return 'INSTALLMENT'
 }
 
-export default function PayInstallmentModal({ item, onClose, onConfirm }) {
+export default function PayInstallmentModal({ item, onClose, onConfirm, onSuccess }) {
   const kind = kindOf(item)
   const [amount, setAmount] = useState(Number(item?.amount || 0))
   const [accounts, setAccounts] = useState([])
@@ -88,6 +88,7 @@ export default function PayInstallmentModal({ item, onClose, onConfirm }) {
     setLoading(true)
     try {
       await onConfirm(item, { amount, sourceAccountId })
+      await onSuccess?.()
     } catch (err) {
       setError(err.response?.data?.message || 'Erro ao confirmar.')
       setLoading(false)

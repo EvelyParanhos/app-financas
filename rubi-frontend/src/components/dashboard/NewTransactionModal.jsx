@@ -28,7 +28,7 @@ const ACCOUNT_LABEL = {
   CREDIT_CARD: 'Cartão', INVESTMENT: 'Investimento',
 }
 
-export default function NewTransactionModal({ onClose, onSaved, month, year }) {
+export default function NewTransactionModal({ onClose, onSaved, onSuccess, month, year }) {
   const [type,       setType]       = useState('EXPENSE')
   const [amount,     setAmount]     = useState(0)
   const [desc,       setDesc]       = useState('')
@@ -137,6 +137,7 @@ export default function NewTransactionModal({ onClose, onSaved, month, year }) {
         payload.destinationAccount = { id: destId }
       }
       await transactionsAPI.create(payload, Math.max(1, parseInt(parcelas) || 1))
+      await onSuccess?.()
       onSaved?.()
     } catch (err) {
       setError(err.response?.data?.message || 'Erro ao criar transação.')

@@ -80,7 +80,6 @@ export default function Dashboard() {
     }
 
     setPayTarget(null)
-    load()
   }
 
   if (loading && !data) return (
@@ -414,7 +413,8 @@ export default function Dashboard() {
       {showNewTx && (
         <NewTransactionModal
           onClose={() => setShowNewTx(false)}
-          onSaved={() => { setShowNewTx(false); load() }}
+          onSaved={() => setShowNewTx(false)}
+          onSuccess={load}
           month={month} year={year}
         />
       )}
@@ -423,6 +423,7 @@ export default function Dashboard() {
           item={payTarget}
           onClose={() => setPayTarget(null)}
           onConfirm={handleChecklistConfirm}
+          onSuccess={load}
         />
       )}
     </div>

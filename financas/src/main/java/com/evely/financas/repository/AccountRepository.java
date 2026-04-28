@@ -45,6 +45,33 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
     @Query("UPDATE Account a SET a.balance = a.balance - :valor WHERE a.id = :id AND a.balance >= :valor")
     int decrementBalance(@Param("id") UUID id, @Param("valor") BigDecimal valor);
 
+    @Modifying
+    @Query("""
+        UPDATE Account a
+        SET a.balance = a.balance - :valor
+        WHERE a.id = :id
+        AND a.active = true
+        AND a.type = com.evely.financas.enums.AccountType.CREDIT_CARD
+        AND (a.cardLimit IS NULL OR a.cardLimit <= 0 OR a.balance >= :valor)
+    """)
+    int consumeCreditLimit(@Param("id") UUID id, @Param("valor") BigDecimal valor);
+
+    @Modifying
+    @Query("""
+        UPDATE Account a
+        SET a.balance = CASE
+            WHEN a.cardLimit IS NOT NULL
+                 AND a.cardLimit > 0
+                 AND a.balance + :valor > a.cardLimit
+            THEN a.cardLimit
+            ELSE a.balance + :valor
+        END
+        WHERE a.id = :id
+        AND a.active = true
+        AND a.type = com.evely.financas.enums.AccountType.CREDIT_CARD
+    """)
+    int restoreCreditLimit(@Param("id") UUID id, @Param("valor") BigDecimal valor);
+
     /**
      * Incrementa o saldo sem validação de limite (usado para créditos/entradas).
      */

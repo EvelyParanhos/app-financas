@@ -131,7 +131,8 @@ export default function Transactions() {
       {showNew && (
         <NewTransactionModal
           onClose={() => setShowNew(false)}
-          onSaved={() => { setShowNew(false); load() }}
+          onSaved={() => setShowNew(false)}
+          onSuccess={load}
           month={month} year={year}
         />
       )}

@@ -102,6 +102,11 @@ public class AccountService {
         invoice.setStatus(InvoiceStatus.OPEN);
 
         creditCardInvoiceRepository.save(invoice);
+
+        int updated = accountRepository.consumeCreditLimit(conta.getId(), valorAberto);
+        if (updated == 0) {
+            throw new RuntimeException("Limite insuficiente para registrar a fatura inicial do cartao.");
+        }
     }
 
     @Transactional

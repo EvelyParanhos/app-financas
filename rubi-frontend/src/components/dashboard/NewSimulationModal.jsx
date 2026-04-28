@@ -11,7 +11,7 @@ import { transactionsAPI, accountsAPI, categoriesAPI } from '../../services/api'
 import { Button, Field, FormError } from '../ui/FormElements'
 import CurrencyInput from '../ui/CurrencyInput'
 
-export default function NewSimulationModal({ onClose, onSaved, month, year }) {
+export default function NewSimulationModal({ onClose, onSaved, onSuccess, month, year }) {
   const [amount,     setAmount]     = useState(0)
   const [desc,       setDesc]       = useState('')
   const [accountId,  setAccountId]  = useState('')
@@ -55,6 +55,7 @@ export default function NewSimulationModal({ onClose, onSaved, month, year }) {
         category:     categoryId ? { id: categoryId } : null,
         isSimulation: true,
       }, Math.max(1, parseInt(parcelas) || 1))
+      await onSuccess?.()
       onSaved?.()
     } catch (err) {
       setError(err.response?.data?.message || 'Erro ao criar simulação.')
