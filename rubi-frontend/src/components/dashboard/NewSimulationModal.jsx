@@ -55,6 +55,7 @@ export default function NewSimulationModal({ onClose, onSaved, onSuccess, month,
         category:     categoryId ? { id: categoryId } : null,
         isSimulation: true,
       }, Math.max(1, parseInt(parcelas) || 1))
+      onClose?.()
       await onSuccess?.()
       onSaved?.()
     } catch (err) {

@@ -88,6 +88,7 @@ export default function PayInstallmentModal({ item, onClose, onConfirm, onSucces
     setLoading(true)
     try {
       await onConfirm(item, { amount, sourceAccountId })
+      onClose?.()
       await onSuccess?.()
     } catch (err) {
       setError(err.response?.data?.message || 'Erro ao confirmar.')

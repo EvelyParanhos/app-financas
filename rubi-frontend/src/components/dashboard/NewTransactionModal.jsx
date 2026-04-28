@@ -137,6 +137,7 @@ export default function NewTransactionModal({ onClose, onSaved, onSuccess, month
         payload.destinationAccount = { id: destId }
       }
       await transactionsAPI.create(payload, Math.max(1, parseInt(parcelas) || 1))
+      onClose?.()
       await onSuccess?.()
       onSaved?.()
     } catch (err) {

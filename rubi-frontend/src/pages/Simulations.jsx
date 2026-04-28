@@ -35,7 +35,12 @@ export default function Simulations() {
 
   const activate = async (id) => {
     setError('')
-    try { await transactionsAPI.activate(id); load() } catch (err) { setError(err.response?.data?.message || 'Erro inesperado') }
+    try {
+      await transactionsAPI.activate(id)
+      await load()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erro inesperado')
+    }
   }
 
   const del = async (id) => {
@@ -158,7 +163,6 @@ public List<TransactionItemDTO> listarSimulacoes(UUID userId, int month, int yea
       {showNew && (
         <NewSimulationModal
           onClose={() => setShowNew(false)}
-          onSaved={() => setShowNew(false)}
           onSuccess={load}
           month={month} year={year}
         />

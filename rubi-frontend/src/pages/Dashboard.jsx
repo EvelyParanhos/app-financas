@@ -79,7 +79,6 @@ export default function Dashboard() {
       await installmentsAPI.pay(item.installmentId)
     }
 
-    setPayTarget(null)
   }
 
   if (loading && !data) return (
@@ -413,7 +412,6 @@ export default function Dashboard() {
       {showNewTx && (
         <NewTransactionModal
           onClose={() => setShowNewTx(false)}
-          onSaved={() => setShowNewTx(false)}
           onSuccess={load}
           month={month} year={year}
         />
