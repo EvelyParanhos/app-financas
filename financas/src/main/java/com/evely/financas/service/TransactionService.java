@@ -19,7 +19,6 @@ import com.evely.financas.model.CreditCardInvoice;
 import com.evely.financas.model.Installment;
 import com.evely.financas.model.Transaction;
 import com.evely.financas.model.User;
-import com.evely.financas.repository.AccountRepository;
 import com.evely.financas.repository.InstallmentRepository;
 import com.evely.financas.repository.TransactionRepository;
 import com.evely.financas.repository.UserRepository;
@@ -32,7 +31,6 @@ public class TransactionService {
     private final InstallmentRepository installmentRepository;
     private final UserRepository userRepository;
     private final BalanceService balanceService;
-    private final AccountRepository accountRepository;
     private final CreditCardInvoiceService creditCardInvoiceService;
     private final AccountService accountService;
 
@@ -130,7 +128,8 @@ public class TransactionService {
                     transacaoSalva.getAccount(),
                     transacaoSalva.getDestinationAccount(),
                     transacaoSalva.getTotalAmount(),
-                    userId
+                    userId,
+                    transacaoSalva.getPurchaseDate()
                 );
             }
             return transacaoSalva;
@@ -186,12 +185,8 @@ public class TransactionService {
                     transacaoSalva.getAccount(),
                     transacaoSalva.getTotalAmount()
                 );
-            } else if (transacaoSalva.getType() == TransactionType.TRANSFER) {
-                balanceService.transferir(
-                    transacaoSalva.getAccount(),
-                    transacaoSalva.getDestinationAccount(),
-                    transacaoSalva.getTotalAmount()
-                );
+            } else if (!isMaterializacaoRecorrente(transacaoSalva)) {
+                liquidarParcelasDeCaixa(transacaoSalva);
             }
         }
 
@@ -203,7 +198,7 @@ public class TransactionService {
     // =========================================================
 
     @Transactional
-    public void efetivarSimulacao(UUID transactionId) {
+    public void efetivarSimulacao(UUID transactionId, UUID userId) {
         Transaction transacao = transactionRepository.findById(transactionId)
             .orElseThrow(() -> new ObjectNotFoundException("Simulação não encontrada!"));
 
@@ -211,9 +206,14 @@ public class TransactionService {
             throw new RuntimeException("Esta transação já é real!");
         }
 
-        Account conta = accountRepository.findById(transacao.getAccount().getId())
-            .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada"));
+        Account conta = accountService.buscarContaComAcessoPermitido(transacao.getAccount().getId(), userId);
         transacao.setAccount(conta);
+
+        if (transacao.getType() == TransactionType.TRANSFER) {
+            Account destino = accountService.buscarContaComAcessoPermitido(
+                transacao.getDestinationAccount().getId(), userId);
+            transacao.setDestinationAccount(destino);
+        }
 
         boolean ehCartao = conta.getType() == AccountType.CREDIT_CARD;
         transacao.setSimulation(false);
@@ -237,8 +237,12 @@ public class TransactionService {
             balanceService.transferir(
                 transacao.getAccount(),
                 transacao.getDestinationAccount(),
-                transacao.getTotalAmount()
+                transacao.getTotalAmount(),
+                userId,
+                transacao.getPurchaseDate()
             );
+        } else {
+            liquidarParcelasDeCaixa(transacao);
         }
 
         transactionRepository.save(transacao);
@@ -268,6 +272,28 @@ public class TransactionService {
 
     private boolean isContaDeCaixa(Account conta) {
         return conta.getType() == AccountType.CASH || conta.getType() == AccountType.CHECKING;
+    }
+
+    private boolean isMaterializacaoRecorrente(Transaction transacao) {
+        return transacao.getDescription() != null
+            && transacao.getDescription().startsWith("[RECORRENTE]");
+    }
+
+    private void liquidarParcelasDeCaixa(Transaction transacao) {
+        for (Installment parcela : transacao.getInstallments()) {
+            if (parcela.getStatus() == InstallmentStatus.PAID) {
+                continue;
+            }
+
+            switch (transacao.getType()) {
+                case EXPENSE, LOAN_OUT -> balanceService.baixarSaldo(transacao.getAccount(), parcela.getAmount());
+                case INCOME -> balanceService.subirSaldo(transacao.getAccount(), parcela.getAmount());
+                default -> { }
+            }
+
+            parcela.setStatus(InstallmentStatus.PAID);
+            installmentRepository.save(parcela);
+        }
     }
 
     public List<TransactionItemDTO> listarSimulacoes(UUID userId, int month, int year) {

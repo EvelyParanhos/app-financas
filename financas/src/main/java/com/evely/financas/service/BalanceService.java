@@ -60,7 +60,7 @@ public class BalanceService {
      *               Passe null se chamado fora de contexto de usuário autenticado.
      */
     @Transactional
-    public void transferir(Account origem, Account destino, BigDecimal valor, UUID userId) {
+    public void transferir(Account origem, Account destino, BigDecimal valor, UUID userId, LocalDate dataMovimento) {
         baixarSaldo(origem, valor);
         if (destino.getType() == AccountType.INVESTMENT) {
             UUID operadorId = userId != null ? userId : origem.getOwner().getId();
@@ -68,7 +68,7 @@ public class BalanceService {
                 destino.getId(),
                 InvestmentEntryType.DEPOSIT,
                 valor,
-                LocalDate.now(),
+                dataMovimento != null ? dataMovimento : LocalDate.now(),
                 "Transferencia de " + origem.getName()
             ), operadorId);
         } else {
@@ -85,13 +85,18 @@ public class BalanceService {
         }
     }
 
+    @Transactional
+    public void transferir(Account origem, Account destino, BigDecimal valor, UUID userId) {
+        transferir(origem, destino, valor, userId, LocalDate.now());
+    }
+
     /**
      * Sobrecarga sem userId — mantém compatibilidade com chamadas internas
      * que não têm contexto de usuário (ex: efetivarSimulacao via scheduler).
      */
     @Transactional
     public void transferir(Account origem, Account destino, BigDecimal valor) {
-        transferir(origem, destino, valor, null);
+        transferir(origem, destino, valor, null, LocalDate.now());
     }
 
     public void validarSaldo(Account conta, BigDecimal valor) {

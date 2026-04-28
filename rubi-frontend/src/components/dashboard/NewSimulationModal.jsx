@@ -2,7 +2,7 @@
  * NewSimulationModal.jsx
  * Modal específico para simulações (tema roxo/violet).
  * Envia isSimulation: true — não afeta saldo real.
- * Aparece no dashboard com badge "simulação".
+ * Aparece na aba Simulações até ser efetivada ou excluída.
  * Em Simulações → botão "Efetivar" → POST /api/transactions/efetivar/{id}
  */
 import { useState, useEffect } from 'react'
@@ -149,7 +149,7 @@ export default function NewSimulationModal({ onClose, onSaved, month, year }) {
             background: 'rgba(136,141,218,0.06)', border: '1px solid rgba(136,141,218,0.2)',
             color: 'var(--violet)', fontSize: 12, lineHeight: 1.5,
           }}>
-            Esta transação aparece no checklist com badge <strong>simulação</strong> e pode ser efetivada quando você decidir comprar.
+            Esta transação fica ativa em Simulações e pode ser efetivada quando você decidir comprar.
           </div>
 
           <CurrencyInput value={amount} onChange={setAmount} label="Valor simulado" id="sim-amount" large />

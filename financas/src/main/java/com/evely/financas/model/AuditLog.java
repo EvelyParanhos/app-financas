@@ -22,7 +22,6 @@ public class AuditLog {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
@@ -43,7 +42,6 @@ public class AuditLog {
     /**
      * ID da entidade afetada (UUID em VARCHAR para consistência com o restante do projeto).
      */
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "entity_id", nullable = false)
     private UUID entityId;
 

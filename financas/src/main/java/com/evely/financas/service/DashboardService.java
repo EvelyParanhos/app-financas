@@ -328,9 +328,6 @@ public class DashboardService {
             if (rt.getType() != TransactionType.EXPENSE
                     && rt.getType() != TransactionType.INCOME
                     && rt.getType() != TransactionType.TRANSFER) continue;
-            if (rt.getType() == TransactionType.TRANSFER
-                    && (rt.getDestinationAccount() == null
-                        || rt.getDestinationAccount().getType() != AccountType.INVESTMENT)) continue;
 
             String descMaterializada = "[RECORRENTE] " + rt.getDescription();
             boolean jaMaterializada = transactionRepository.existsByDescriptionAndAccountIdAndPurchaseDateBetween(
@@ -394,13 +391,23 @@ public class DashboardService {
     }
 
     private String tipoRecorrenteLabel(RecurringTransaction rt) {
-        if (rt.getType() == TransactionType.TRANSFER) return "Aporte em investimento";
+        if (rt.getType() == TransactionType.TRANSFER
+                && rt.getDestinationAccount() != null
+                && rt.getDestinationAccount().getType() == AccountType.INVESTMENT) {
+            return "Aporte em investimento";
+        }
+        if (rt.getType() == TransactionType.TRANSFER) return "Transferencia recorrente";
         if (rt.getType() == TransactionType.INCOME) return "Entrada fixa";
         return "Fixo";
     }
 
     private String tipoRecorrenteLabel(Transaction t) {
-        if (t.getType() == TransactionType.TRANSFER) return "Aporte em investimento";
+        if (t.getType() == TransactionType.TRANSFER
+                && t.getDestinationAccount() != null
+                && t.getDestinationAccount().getType() == AccountType.INVESTMENT) {
+            return "Aporte em investimento";
+        }
+        if (t.getType() == TransactionType.TRANSFER) return "Transferencia recorrente";
         if (t.getType() == TransactionType.INCOME) return "Entrada fixa";
         return "Fixo";
     }

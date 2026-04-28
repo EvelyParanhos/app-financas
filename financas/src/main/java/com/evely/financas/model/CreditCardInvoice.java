@@ -30,7 +30,6 @@ public class CreditCardInvoice {
 
     @ManyToOne
     @JoinColumn(name = "account_id", nullable = false)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Account account;
 
     @Column(name = "reference_month", nullable = false)

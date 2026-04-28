@@ -26,7 +26,6 @@ public class InvestmentEntry {
 
     @ManyToOne
     @JoinColumn(name = "account_id", nullable = false)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Account account;
 
     @Enumerated(EnumType.STRING)

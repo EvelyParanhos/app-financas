@@ -26,7 +26,6 @@ public class Loan {
 
     @ManyToOne
     @JoinColumn(name = "lender_user_id", nullable = false)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private User lender;
 
     @Column(name = "borrower_name")
@@ -34,17 +33,14 @@ public class Loan {
 
     @ManyToOne
     @JoinColumn(name = "borrower_user_id")
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private User borrowerUser;
 
     @ManyToOne
     @JoinColumn(name = "source_account_id", nullable = false)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Account sourceAccount;
 
     @ManyToOne
     @JoinColumn(name = "target_account_id")
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Account targetAccount;
 
     @Column(name = "total_amount", nullable = false)
@@ -67,7 +63,6 @@ public class Loan {
 
     @ManyToOne
     @JoinColumn(name = "origin_transaction_id")
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Transaction originTransaction;
 
     @CreationTimestamp

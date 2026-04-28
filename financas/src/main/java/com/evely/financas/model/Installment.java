@@ -31,12 +31,10 @@ public class Installment {
     private UUID id;
 
     @ManyToOne
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     @JoinColumn (name = "transaction_id")
     private Transaction transaction;
 
     @ManyToOne
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     @JoinColumn (name = "payer_id")
     private User payer;
 
@@ -53,7 +51,6 @@ public class Installment {
 
     @ManyToOne
     @JoinColumn(name = "invoice_id")
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private CreditCardInvoice invoice;
 
 }

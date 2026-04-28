@@ -32,12 +32,10 @@ public class Partnership {
     private UUID id;
 
     @ManyToOne
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     @JoinColumn(name = "user_a_id", nullable = false)
     private User userA;
 
     @ManyToOne
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     @JoinColumn(name = "user_b_id", nullable = false)
     private User userB;
 

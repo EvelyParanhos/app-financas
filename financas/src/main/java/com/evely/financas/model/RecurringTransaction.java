@@ -35,7 +35,6 @@ public class RecurringTransaction {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     @JsonIgnore
     private User user;
 
@@ -52,17 +51,14 @@ public class RecurringTransaction {
 
     @ManyToOne
     @JoinColumn(name = "account_id")
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Account account; 
 
     @ManyToOne
     @JoinColumn(name = "destination_account_id")
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Account destinationAccount;
 
     @ManyToOne
     @JoinColumn(name = "category_id")
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Category category;
 
     @Column(name = "is_variable")

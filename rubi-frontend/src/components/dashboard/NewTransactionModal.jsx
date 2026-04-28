@@ -4,7 +4,7 @@
  * Regras de negócio (#5):
  * - EXPENSE  → qualquer conta exceto INVESTMENT
  * - INCOME   → apenas CASH ou CHECKING
- * - TRANSFER → origem e destino apenas CASH ou CHECKING
+ * - TRANSFER → origem CASH/CHECKING; destino CASH, CHECKING ou INVESTMENT
  *
  * Parcelas: campo numérico manual (não dropdown), padrão 1
  * Contas: GET /api/accounts?includePartner=true

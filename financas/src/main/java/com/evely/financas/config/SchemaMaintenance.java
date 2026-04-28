@@ -22,6 +22,12 @@ public class SchemaMaintenance {
         executeIgnoringFailure(
             "ALTER TABLE recurring_transactions ADD COLUMN destination_account_id varchar(36) NULL"
         );
+        executeIgnoringFailure(
+            "ALTER TABLE recurring_transactions MODIFY COLUMN type varchar(30) NOT NULL"
+        );
+        executeIgnoringFailure(
+            "ALTER TABLE transactions MODIFY COLUMN type varchar(30) NULL"
+        );
     }
 
     private void executeIgnoringFailure(String sql) {

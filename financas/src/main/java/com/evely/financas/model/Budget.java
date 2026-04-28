@@ -28,12 +28,10 @@ public class Budget {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private User owner;
 
     @ManyToOne
     @JoinColumn(name = "category_id", nullable = false)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     private Category category;
 
     @Column(name = "amount_limit", nullable = false)

@@ -34,7 +34,6 @@ public class Account {
     private String name;
 
     @ManyToOne
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     @JoinColumn(name = "owner_id")
     private User owner;
 

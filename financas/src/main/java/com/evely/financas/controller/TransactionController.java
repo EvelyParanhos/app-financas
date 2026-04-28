@@ -62,8 +62,10 @@ public class TransactionController {
     }
 
     @PostMapping("/efetivar/{simulationId}")
-    public ResponseEntity<String> efetivarSimulacao(@PathVariable UUID simulationId) {
-        transactionService.efetivarSimulacao(simulationId);
+    public ResponseEntity<String> efetivarSimulacao(
+            @PathVariable UUID simulationId,
+            @AuthenticationPrincipal User user) {
+        transactionService.efetivarSimulacao(simulationId, user.getId());
         return ResponseEntity.ok(
             "Perfeito! Deixou de ser uma simulação e passou a ser " +
             "uma transação real! Seu dashboard atualizou!");

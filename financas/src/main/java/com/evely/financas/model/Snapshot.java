@@ -30,7 +30,6 @@ public class Snapshot {
     private UUID id;
 
     @ManyToOne
-    @JdbcTypeCode(SqlTypes.VARCHAR)
     @JoinColumn (name = "account_id")
     private Account account;
     
