@@ -25,6 +25,16 @@ export function AuthProvider({ children }) {
     else setLoading(false)
   }, [fetchMe])
 
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setUser(null)
+      setLoading(false)
+    }
+
+    window.addEventListener('rubi:session-expired', handleSessionExpired)
+    return () => window.removeEventListener('rubi:session-expired', handleSessionExpired)
+  }, [])
+
   const login = async (email, password) => {
     const { data } = await authAPI.login(email, password)
     localStorage.setItem('rubi_token', data.token)

@@ -5,6 +5,28 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+const PUBLIC_AUTH_PATHS = [
+  '/auth/login',
+  '/users',
+  '/users/verificar',
+  '/users/reenviar',
+]
+
+function isPublicAuthRequest(url = '') {
+  return PUBLIC_AUTH_PATHS.some(path => url === path || url.startsWith(`${path}?`))
+}
+
+function redirectToLogin() {
+  localStorage.removeItem('rubi_token')
+  window.dispatchEvent(new Event('rubi:session-expired'))
+
+  const { pathname, search } = window.location
+  if (pathname === '/login') return
+
+  const next = encodeURIComponent(`${pathname}${search}`)
+  window.location.replace(`/login?expired=1&next=${next}`)
+}
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('rubi_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
@@ -14,10 +36,13 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('rubi_token')
-      window.location.href = '/login'
+    const status = err.response?.status
+    const url = err.config?.url || ''
+
+    if (status === 401 && !isPublicAuthRequest(url)) {
+      redirectToLogin()
     }
+
     return Promise.reject(err)
   }
 )
