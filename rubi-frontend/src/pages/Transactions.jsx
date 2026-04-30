@@ -117,11 +117,11 @@ export default function Transactions() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{tx.description}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {tx.categoryName} • {new Date(tx.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                  {tx.categoryName} • {new Date(tx.purchaseDate + 'T00:00:00').toLocaleDateString('pt-BR')}
                 </div>
               </div>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color }}>
-                {isIn ? '+' : isOut ? '-' : ''}{fmt(tx.amount)}
+                {isIn ? '+' : isOut ? '-' : ''}{fmt(tx.totalAmount)}
               </div>
             </div>
           )

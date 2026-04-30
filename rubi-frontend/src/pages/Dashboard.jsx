@@ -87,7 +87,7 @@ export default function Dashboard() {
     </div>
   )
 
-  const checklist = data?.installmentsDueThisMonth || []
+  const checklist = data?.installmentItems || []
   const pending   = checklist.filter(i => i.status === 'PENDING')
   const paid      = checklist.filter(i => i.status === 'PAID')
 
@@ -164,9 +164,9 @@ export default function Dashboard() {
               onClick={() => setPopover(p => p === 'leftover' ? null : 'leftover')}
             />
             <SCard
-              label="Comprometido" value={fmt(data?.committedAmount)} color="var(--violet)"
+              label="Comprometido" value={fmt(data?.committed)} color="var(--violet)"
               icon={<CreditCard size={15}/>}
-              sub={`Cartão: ${fmt(data?.creditCardCommitted)}`}
+              sub={`Cartão: ${fmt(data?.ccCommitted)}`}
               active={popover === 'committed'}
               onClick={() => setPopover(p => p === 'committed' ? null : 'committed')}
             />
@@ -228,7 +228,7 @@ export default function Dashboard() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>− Comprometido</span>
-                    <span style={{ color: 'var(--danger)', fontWeight: 700 }}>− {fmt(data.committedAmount)}</span>
+                    <span style={{ color: 'var(--danger)', fontWeight: 700 }}>− {fmt(data.committed)}</span>
                   </div>
                   <div style={{ height: 1, background: 'var(--border)' }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -247,12 +247,12 @@ export default function Dashboard() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Faturas de cartão</span>
-                    <span style={{ fontWeight: 700 }}>{fmt(data.creditCardCommitted)}</span>
+                    <span style={{ fontWeight: 700 }}>{fmt(data.ccCommitted)}</span>
                   </div>
                   <div style={{ height: 1, background: 'var(--border)' }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontWeight: 700 }}>Total</span>
-                    <span style={{ color: 'var(--violet)', fontWeight: 700 }}>{fmt(data.committedAmount)}</span>
+                    <span style={{ color: 'var(--violet)', fontWeight: 700 }}>{fmt(data.committed)}</span>
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
                     Veja o checklist para o detalhamento por item.
@@ -362,10 +362,10 @@ export default function Dashboard() {
               Orçamentos
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {(data?.budgetStatus || []).slice(0, 4).map(b => (
+              {(data?.budgets || []).slice(0, 4).map(b => (
                 <BudgetBar key={b.id} budget={b} />
               ))}
-              {!(data?.budgetStatus?.length) && (
+              {!(data?.budgets?.length) && (
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                   Configure orçamentos em Configurações
                 </div>
@@ -374,12 +374,12 @@ export default function Dashboard() {
           </div>
 
           {/* Faturas pendentes */}
-          {(data?.pendingInvoices || []).length > 0 && (
+          {(data?.invoices || []).length > 0 && (
             <div style={{ padding: '14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>
                 Faturas pendentes
               </div>
-              {(data?.pendingInvoices || []).slice(0, 3).map(inv => (
+              {(data?.invoices || []).slice(0, 3).map(inv => (
                 <div key={inv.invoiceId} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '5px 0', fontSize: 11, borderBottom: '1px solid var(--border)',
@@ -611,7 +611,7 @@ function RecentItem({ tx }) {
         fontFamily: 'var(--font-body)', fontSize: 11, fontWeight: 700,
         color: isOut ? 'var(--danger)' : 'var(--mint)', flexShrink: 0,
       }}>
-        {isOut ? '-' : '+'}{fmt(tx.amount)}
+        {isOut ? '-' : '+'}{fmt(tx.totalAmount)}
       </div>
     </div>
   )

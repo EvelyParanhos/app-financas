@@ -14,12 +14,12 @@ public class DashboardDTO {
     private List<AccountBalanceDTO> accountBreakdown; // detalhamento por conta corrente/carteira
 
     // --- Card 2: Comprometido ---
-    private BigDecimal committedAmount;
+    private BigDecimal committed;
     private BigDecimal fixedExpensesCommitted; // quanto vem de gastos fixos recorrentes
-    private BigDecimal creditCardCommitted;    // quanto vem de faturas de cartão pendentes
+    private BigDecimal ccCommitted;            // quanto vem de faturas de cartão pendentes
 
     // --- Card 3: Sobra Projetada ---
-    private BigDecimal projectedLeftover;   // projectedIncome - committedAmount
+    private BigDecimal projectedLeftover;   // projectedIncome - committed
     private BigDecimal projectedIncome;     // entradas previstas no mês (salário + outros INCOME)
 
     // --- Card 4: A Receber ---
@@ -29,12 +29,12 @@ public class DashboardDTO {
     private BigDecimal monthlyDeposits;     // aportes em investimentos no mês selecionado
 
     // --- Listas da Home ---
-    private List<InvoiceSummaryDTO> pendingInvoices;
-    private List<InstallmentItemDTO> installmentsDueThisMonth;
+    private List<InvoiceSummaryDTO> invoices;
+    private List<InstallmentItemDTO> installmentItems;
     private List<TransactionItemDTO> recentTransactions;
 
     // --- Extras ---
-    private List<BudgetStatusDTO> budgetStatus;
+    private List<BudgetStatusDTO> budgets;
     private List<MonthProjectionDTO> projection;
     private boolean hasPartner;
 }
