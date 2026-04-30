@@ -304,8 +304,14 @@ public class TransactionService {
     }
 
     private void liquidarParcelasDeCaixa(Transaction transacao) {
+        LocalDate hoje = LocalDate.now();
         for (Installment parcela : transacao.getInstallments()) {
             if (parcela.getStatus() == InstallmentStatus.PAID) {
+                continue;
+            }
+
+            // Regime de caixa: parcelas futuras ficam pendentes ate o vencimento.
+            if (parcela.getDueDate() != null && parcela.getDueDate().isAfter(hoje)) {
                 continue;
             }
 
