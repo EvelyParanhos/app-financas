@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { TrendingUp, Plus, PiggyBank, History, ChevronDown, ChevronUp, X, Check } from 'lucide-react'
 import { investmentsAPI } from '../services/api'
 import { Button, Badge } from '../components/ui/FormElements'
+import CurrencyInput from '../components/ui/CurrencyInput'
 
 function fmt(n) {
   return 'R$ ' + Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
@@ -11,11 +12,13 @@ export default function Investments() {
   const [summaries,  setSummaries]  = useState([])
   const [projection, setProjection] = useState([])
   const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState('')
   const [expanded,   setExpanded]   = useState(null)
   const [showEntry,  setShowEntry]  = useState(false)
 
   const load = async () => {
     setLoading(true)
+    setError('')
     try {
       const [{ data: s }, { data: p }] = await Promise.all([
         investmentsAPI.summary(),
@@ -23,7 +26,11 @@ export default function Investments() {
       ])
       setSummaries(s || [])
       setProjection(p || [])
-    } catch { setSummaries([]); setProjection([]) }
+    } catch (err) {
+      setSummaries([])
+      setProjection([])
+      setError(err.response?.data?.message || 'Nao foi possivel carregar investimentos.')
+    }
     finally { setLoading(false) }
   }
 
@@ -58,6 +65,8 @@ export default function Investments() {
       </div>
 
       <div className="scrollable" style={{ flex: 1, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {error && <div style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</div>}
+
         {/* Account cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
           {summaries.map((s) => (
@@ -134,7 +143,7 @@ export default function Investments() {
 function InvestmentEntryModal({ summaries, onClose, onSaved }) {
   const [accountId, setAccountId] = useState(summaries[0]?.accountId || '')
   const [type, setType] = useState('DEPOSIT')
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount] = useState(0)
   const [date, setDate] = useState(() => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -145,13 +154,13 @@ function InvestmentEntryModal({ summaries, onClose, onSaved }) {
 
   const submit = async () => {
     if (!accountId) return setError('Selecione uma conta de investimento.')
-    if (!amount || Number(amount) <= 0) return setError('Informe um valor maior que zero.')
+    if (!amount || amount <= 0) return setError('Informe um valor maior que zero.')
     setLoading(true); setError('')
     try {
       await investmentsAPI.entry({
         accountId,
         type,
-        amount: Number(amount),
+        amount,
         entryDate: date,
         notes: notes.trim() || null,
       })
@@ -203,7 +212,7 @@ function InvestmentEntryModal({ summaries, onClose, onSaved }) {
               }}>{label}</button>
             ))}
           </div>
-          <input type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Valor" style={input} />
+          <CurrencyInput value={amount} onChange={setAmount} label="Valor" id="investment-amount" />
           <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...input, colorScheme: 'dark' }} />
           <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Observacao" style={input} />
           {error && <div style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</div>}
@@ -219,13 +228,18 @@ function InvestmentEntryModal({ summaries, onClose, onSaved }) {
 
 function InvestmentCard({ summary: s, expanded, onToggle }) {
   const [history, setHistory] = useState([])
+  const [error, setError] = useState('')
 
   const loadHistory = async () => {
     if (!expanded) {
+      setError('')
       try {
         const { data } = await investmentsAPI.history(s.accountId)
         setHistory(data || [])
-      } catch { setHistory([]) }
+      } catch (err) {
+        setHistory([])
+        setError(err.response?.data?.message || 'Nao foi possivel carregar o historico.')
+      }
     }
     onToggle()
   }
@@ -266,6 +280,7 @@ function InvestmentCard({ summary: s, expanded, onToggle }) {
 
       {expanded && (
         <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', maxHeight: 200, overflowY: 'auto' }} className="scrollable">
+          {error && <div style={{ color: 'var(--danger)', fontSize: 12, marginBottom: 8 }}>{error}</div>}
           {history.map((e, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
               <span style={{ color: 'var(--text-secondary)' }}>{new Date(e.entryDate).toLocaleDateString('pt-BR')} • {e.type}</span>

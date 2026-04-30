@@ -13,7 +13,6 @@ import com.evely.financas.model.Account;
 import com.evely.financas.model.CreditCardInvoice;
 import com.evely.financas.model.Installment;
 import com.evely.financas.model.InvestmentEntry;
-import com.evely.financas.repository.CreditCardInvoiceRepository;
 import com.evely.financas.repository.InstallmentRepository;
 import com.evely.financas.repository.InvestmentEntryRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,9 +23,9 @@ public class EstornoService {
 
     private final InstallmentRepository installmentRepository;
     private final BalanceService balanceService;
-    private final CreditCardInvoiceRepository invoiceRepository;
     private final InvestmentEntryRepository investmentEntryRepository;
     private final AuditService auditService;
+    private final CreditCardInvoiceService creditCardInvoiceService;
 
     @Transactional
     public Installment estornarParcela(UUID installmentId, UUID userId) {
@@ -80,13 +79,7 @@ public class EstornoService {
                     "Para estornar, entre em contato com o suporte.");
             }
 
-            if (invoice.getPaidAmount().compareTo(parcela.getAmount()) >= 0) {
-                invoice.setPaidAmount(invoice.getPaidAmount().subtract(parcela.getAmount()));
-                invoice.setStatus(InvoiceStatus.PARTIALLY_PAID);
-                invoiceRepository.save(invoice);
-            }
-
-            balanceService.baixarSaldo(conta, parcela.getAmount());
+            creditCardInvoiceService.removerValorDaFatura(invoice, parcela.getAmount());
             parcela.setStatus(InstallmentStatus.PENDING);
             Installment salva = installmentRepository.save(parcela);
 

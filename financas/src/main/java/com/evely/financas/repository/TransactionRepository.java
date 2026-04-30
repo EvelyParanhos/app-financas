@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import com.evely.financas.model.Transaction;
@@ -14,8 +15,18 @@ import jakarta.transaction.Transactional;
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
 
-    List<Transaction> findTop5ByAccountOwnerIdAndIsSimulationFalseOrderByPurchaseDateDesc(
-        UUID ownerId
+    @Query("""
+        SELECT DISTINCT t FROM Transaction t
+        LEFT JOIN FETCH t.category
+        LEFT JOIN FETCH t.account
+        LEFT JOIN t.installments i
+        WHERE t.isSimulation = false
+        AND (t.account.owner.id = :userId OR i.payer.id = :userId)
+        ORDER BY t.purchaseDate DESC
+    """)
+    List<Transaction> findRecentVisibleByUserId(
+        @Param("userId") UUID userId,
+        Pageable pageable
     );
 
     List<Transaction> findByIsSimulationTrueAndCreatedAtBefore(LocalDateTime limite);
@@ -67,10 +78,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
      * Ordenado por data de compra DESC (mais recente primeiro).
      */
     @Query("""
-        SELECT t FROM Transaction t
+        SELECT DISTINCT t FROM Transaction t
         LEFT JOIN FETCH t.category
         LEFT JOIN FETCH t.account
-        WHERE t.account.owner.id = :userId
+        LEFT JOIN t.installments i
+        WHERE (t.account.owner.id = :userId OR i.payer.id = :userId)
         AND t.isSimulation = false
         AND MONTH(t.purchaseDate) = :month
         AND YEAR(t.purchaseDate) = :year
@@ -83,10 +95,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     );
 
     @Query("""
-    SELECT t FROM Transaction t
+    SELECT DISTINCT t FROM Transaction t
     LEFT JOIN FETCH t.category
     LEFT JOIN FETCH t.account
-    WHERE t.account.owner.id = :userId
+    LEFT JOIN t.installments i
+    WHERE (t.account.owner.id = :userId OR i.payer.id = :userId)
     AND t.isSimulation = true
     AND MONTH(t.purchaseDate) = :month
     AND YEAR(t.purchaseDate) = :year

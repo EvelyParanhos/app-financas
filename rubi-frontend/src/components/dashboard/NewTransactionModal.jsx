@@ -55,7 +55,9 @@ export default function NewTransactionModal({ onClose, onSaved, onSuccess, month
         ])
         setAllAccounts(accs || [])
         setCategories((cats || []).filter(c => c.active !== false))
-      } catch { /* silently fail */ }
+      } catch (err) {
+        setError(err.response?.data?.message || 'Nao foi possivel carregar contas e categorias.')
+      }
     }
     load()
   }, [])

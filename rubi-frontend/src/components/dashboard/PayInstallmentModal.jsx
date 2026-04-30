@@ -41,8 +41,9 @@ export default function PayInstallmentModal({ item, onClose, onConfirm, onSucces
       try {
         const { data } = await accountsAPI.list(true)
         setAccounts(data || [])
-      } catch {
+      } catch (err) {
         setAccounts([])
+        setError(err.response?.data?.message || 'Nao foi possivel carregar as contas de pagamento.')
       }
     }
     load()

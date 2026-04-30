@@ -81,6 +81,38 @@ public class CreditCardInvoiceService {
         invoiceRepository.save(invoice);
     }
 
+    @Transactional
+    public void removerValorDaFatura(CreditCardInvoice invoice, BigDecimal valor) {
+        if (valor == null || valor.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("O valor do estorno deve ser maior que zero.");
+        }
+
+        BigDecimal totalAtual = safe(invoice.getTotalAmount());
+        if (valor.compareTo(totalAtual) > 0) {
+            throw new RuntimeException("O valor do estorno ultrapassa o total da fatura.");
+        }
+
+        BigDecimal novoTotal = totalAtual.subtract(valor);
+        BigDecimal pagoAtual = safe(invoice.getPaidAmount());
+        BigDecimal novoPago = pagoAtual.min(novoTotal);
+
+        invoice.setTotalAmount(novoTotal);
+        invoice.setPaidAmount(novoPago);
+        if (novoTotal.compareTo(BigDecimal.ZERO) == 0 || novoPago.compareTo(novoTotal) == 0) {
+            invoice.setStatus(InvoiceStatus.PAID);
+            invoice.setPaidAt(LocalDateTime.now());
+        } else if (novoPago.compareTo(BigDecimal.ZERO) > 0) {
+            invoice.setStatus(InvoiceStatus.PARTIALLY_PAID);
+            invoice.setPaidAt(null);
+        } else if (invoice.getStatus() == InvoiceStatus.PARTIALLY_PAID) {
+            invoice.setStatus(InvoiceStatus.OPEN);
+            invoice.setPaidAt(null);
+        }
+
+        invoiceRepository.save(invoice);
+        devolverLimiteAoCartao(invoice.getAccount(), valor);
+    }
+
     /**
      * Paga (total ou parcialmente) uma fatura de cartão.
      *
@@ -193,7 +225,8 @@ public class CreditCardInvoiceService {
         return value != null ? value : BigDecimal.ZERO;
     }
 
-    public List<CreditCardInvoice> listarFaturasDoCartao(UUID accountId) {
+    public List<CreditCardInvoice> listarFaturasDoCartao(UUID accountId, UUID userId) {
+        accountService.buscarContaComAcessoPermitido(accountId, userId);
         return invoiceRepository
             .findByAccountIdOrderByReferenceYearDescReferenceMonthDesc(accountId);
     }

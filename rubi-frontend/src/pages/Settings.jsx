@@ -125,7 +125,7 @@ function ContasTab() {
     try {
       const payload = { name: form.name.trim(), type: form.type, initialBalance: form.initialBalance || 0, shared: false }
       if (form.type === 'CREDIT_CARD') {
-        payload.cardLimit  = parseFloat(form.cardLimit) || 0
+        payload.cardLimit  = form.cardLimit || 0
         payload.closingDay = parseInt(form.closingDay) || 10
         payload.dueDay     = parseInt(form.dueDay) || 15
       }
@@ -188,14 +188,9 @@ function ContasTab() {
               />
             </Field>
             {form.type === 'CREDIT_CARD' ? (
-              <Field label="Limite (R$)" htmlFor="s-limit">
-                <input id="s-limit" type="number" value={form.cardLimit}
-                  onChange={e => setForm(f => ({ ...f, cardLimit: e.target.value }))}
-                  placeholder="5000" style={fieldInputStyle}
-                  onFocus={e => e.target.style.borderColor = 'var(--lime)'}
-                  onBlur={e => e.target.style.borderColor = 'var(--border)'}
-                />
-              </Field>
+              <CurrencyInput value={form.cardLimit}
+                onChange={v => setForm(f => ({ ...f, cardLimit: v }))}
+                label="Limite" id="s-limit" />
             ) : form.type !== 'INVESTMENT' && (
               <CurrencyInput value={form.initialBalance}
                 onChange={v => setForm(f => ({ ...f, initialBalance: v }))}

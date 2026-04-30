@@ -19,8 +19,10 @@ public class CreditCardInvoiceController {
     private final CreditCardInvoiceService invoiceService;
 
     @GetMapping("/account/{accountId}")
-    public ResponseEntity<List<CreditCardInvoice>> listarFaturas(@PathVariable UUID accountId) {
-        return ResponseEntity.ok(invoiceService.listarFaturasDoCartao(accountId));
+    public ResponseEntity<List<CreditCardInvoice>> listarFaturas(
+            @PathVariable UUID accountId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(invoiceService.listarFaturasDoCartao(accountId, user.getId()));
     }
 
     @GetMapping("/pending")

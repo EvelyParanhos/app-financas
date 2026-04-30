@@ -6,6 +6,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.stream.*;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import com.evely.financas.dto.*;
 import com.evely.financas.enums.AccountType;
@@ -309,7 +310,7 @@ public class DashboardService {
 
     private List<TransactionItemDTO> buildRecentTransactions(UUID userId) {
         return transactionRepository
-            .findTop5ByAccountOwnerIdAndIsSimulationFalseOrderByPurchaseDateDesc(userId)
+            .findRecentVisibleByUserId(userId, PageRequest.of(0, 5))
             .stream()
             .map(t -> new TransactionItemDTO(
                 t.getId(), t.getDescription(),

@@ -262,7 +262,11 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findById(id)
             .orElseThrow(() -> new ObjectNotFoundException("Transação não encontrada!"));
 
-        if (!transaction.getAccount().getOwner().getId().equals(userId)) {
+        boolean donoDaConta = transaction.getAccount().getOwner().getId().equals(userId);
+        boolean pagadorDaTransacao = transaction.getInstallments().stream()
+            .anyMatch(i -> i.getPayer() != null && i.getPayer().getId().equals(userId));
+
+        if (!donoDaConta && !pagadorDaTransacao) {
             throw new RuntimeException("Sem permissão para excluir esta transação.");
         }
 

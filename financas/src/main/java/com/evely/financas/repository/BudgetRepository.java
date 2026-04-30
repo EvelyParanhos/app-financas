@@ -51,8 +51,18 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
         AND t.category.id = :categoryId
         AND t.isSimulation = false
         AND t.type = 'EXPENSE'
-        AND MONTH(i.dueDate) = :month
-        AND YEAR(i.dueDate) = :year
+        AND (
+            (
+                t.account.type = com.evely.financas.enums.AccountType.CREDIT_CARD
+                AND MONTH(t.purchaseDate) = :month
+                AND YEAR(t.purchaseDate) = :year
+            )
+            OR (
+                t.account.type <> com.evely.financas.enums.AccountType.CREDIT_CARD
+                AND MONTH(i.dueDate) = :month
+                AND YEAR(i.dueDate) = :year
+            )
+        )
     """)
     java.math.BigDecimal calcularGastoPorCategoria(
         @Param("userId") UUID userId,

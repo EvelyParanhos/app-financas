@@ -188,12 +188,20 @@ public class AccountService {
         Account accountExistente = accountRepository.findByIdAndActiveTrue(id)
             .orElseThrow(() -> new ObjectNotFoundException("Conta não encontrada com o ID: " + id));
 
+        if (accountExistente.getType() == AccountType.CREDIT_CARD) {
+            if (accountAtualizada.getCardLimit() != null
+                    && accountAtualizada.getCardLimit().compareTo(BigDecimal.ZERO) < 0) {
+                throw new RuntimeException("O limite do cartao nao pode ser negativo.");
+            }
+            if (accountAtualizada.getClosingDay() == null || accountAtualizada.getDueDay() == null) {
+                throw new RuntimeException("Cartao de credito exige dia de fechamento e vencimento.");
+            }
+            accountExistente.setClosingDay(accountAtualizada.getClosingDay());
+            accountExistente.setDueDay(accountAtualizada.getDueDay());
+            accountExistente.setCardLimit(accountAtualizada.getCardLimit());
+        }
+
         accountExistente.setName(accountAtualizada.getName());
-        accountExistente.setType(accountAtualizada.getType());
-        accountExistente.setClosingDay(accountAtualizada.getClosingDay());
-        accountExistente.setDueDay(accountAtualizada.getDueDay());
-        accountExistente.setCardLimit(accountAtualizada.getCardLimit());
-        accountExistente.setOwner(accountAtualizada.getOwner());
 
         return accountRepository.save(accountExistente);
     }

@@ -118,6 +118,8 @@ public class InstallmentService {
         Installment original = installmentRepository.findById(installmentId)
             .orElseThrow(() -> new ObjectNotFoundException("Parcela não encontrada!"));
 
+        validarAcessoParcela(original, userId);
+
         if (original.getStatus() == InstallmentStatus.PAID) {
             throw new RuntimeException("Não é possível dividir uma parcela já paga.");
         }
@@ -155,6 +157,8 @@ public class InstallmentService {
         Installment parcela = installmentRepository.findById(installmentId)
             .orElseThrow(() -> new ObjectNotFoundException("Parcela não encontrada!"));
 
+        validarAcessoParcela(parcela, userId);
+
         if (parcela.getStatus() == InstallmentStatus.PAID) {
             throw new RuntimeException("Não é possível alterar o pagador de uma parcela já paga.");
         }
@@ -166,6 +170,26 @@ public class InstallmentService {
 
         parcela.setPayer(novoPagador);
         installmentRepository.save(parcela);
+    }
+
+    private void validarAcessoParcela(Installment parcela, UUID userId) {
+        if (parcela.getPayer() != null && parcela.getPayer().getId().equals(userId)) {
+            return;
+        }
+
+        if (parcela.getPayer() != null) {
+            validarPartnership(userId, parcela.getPayer().getId());
+            return;
+        }
+
+        Account conta = parcela.getTransaction() != null
+            ? parcela.getTransaction().getAccount()
+            : null;
+        if (conta != null && conta.getOwner() != null && conta.getOwner().getId().equals(userId)) {
+            return;
+        }
+
+        throw new RuntimeException("Sem permissao para alterar esta parcela.");
     }
 
     private void validarPartnership(UUID userId, UUID outroUserId) {
