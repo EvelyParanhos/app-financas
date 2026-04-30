@@ -53,10 +53,12 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
                SUM(CASE WHEN t.isSimulation = true  THEN i.amount ELSE 0 END)
         FROM Installment i
         JOIN i.transaction t
+        JOIN t.account a
         WHERE i.payer.id = :userId
         AND i.status = 'PENDING'
         AND i.dueDate BETWEEN :inicio AND :fim
         AND i.invoice IS NULL
+        AND a.type <> com.evely.financas.enums.AccountType.CREDIT_CARD
         AND t.type NOT IN ('INCOME', 'TRANSFER', 'INTERNAL_REPAYMENT')
         GROUP BY MONTH(i.dueDate), YEAR(i.dueDate)
         ORDER BY YEAR(i.dueDate), MONTH(i.dueDate)
@@ -100,11 +102,13 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
         SELECT COALESCE(SUM(i.amount), 0)
         FROM Installment i
         JOIN i.transaction t
+        JOIN t.account a
         WHERE i.payer.id = :userId
         AND i.status = 'PENDING'
         AND i.dueDate BETWEEN :inicio AND :fim
         AND i.invoice IS NULL
         AND (:incluirSimulacoes = true OR t.isSimulation = false)
+        AND a.type <> com.evely.financas.enums.AccountType.CREDIT_CARD
         AND t.type NOT IN ('INCOME', 'TRANSFER', 'INTERNAL_REPAYMENT')
     """)
     BigDecimal somarDividasComFiltro(
@@ -140,12 +144,14 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
         SELECT COALESCE(SUM(i.amount), 0)
         FROM Installment i
         JOIN i.transaction t
+        JOIN t.account a
         WHERE i.payer.id = :userId
         AND i.status = 'PENDING'
         AND i.dueDate BETWEEN :inicio AND :fim
         AND i.invoice IS NULL
         AND t.isSimulation = false
-        AND t.account.shared = true
+        AND a.shared = true
+        AND a.type <> com.evely.financas.enums.AccountType.CREDIT_CARD
         AND t.type NOT IN ('INCOME', 'TRANSFER', 'INTERNAL_REPAYMENT')
     """)
     BigDecimal somarDividasComFiltroEContaShared(
