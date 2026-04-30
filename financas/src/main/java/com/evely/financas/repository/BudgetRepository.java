@@ -50,6 +50,7 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
         WHERE i.payer.id = :userId
         AND t.category.id = :categoryId
         AND t.isSimulation = false
+        AND t.type = 'EXPENSE'
         AND MONTH(i.dueDate) = :month
         AND YEAR(i.dueDate) = :year
     """)

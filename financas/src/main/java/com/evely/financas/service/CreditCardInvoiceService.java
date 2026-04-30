@@ -130,8 +130,16 @@ public class CreditCardInvoiceService {
         if (novoPagoTotal.compareTo(invoice.getTotalAmount()) == 0) {
             invoice.setStatus(InvoiceStatus.PAID);
             invoice.setPaidAt(LocalDateTime.now());
+            LocalDate inicioFatura = LocalDate.of(
+                invoice.getReferenceYear(), invoice.getReferenceMonth(), 1);
+            LocalDate fimFatura = YearMonth.of(
+                invoice.getReferenceYear(), invoice.getReferenceMonth()).atEndOfMonth();
             installmentRepository.markInvoiceInstallmentsAsStatus(
-                invoice.getId(), InstallmentStatus.PAID);
+                invoice.getId(),
+                invoice.getAccount().getId(),
+                inicioFatura,
+                fimFatura,
+                InstallmentStatus.PAID);
         } else {
             invoice.setStatus(InvoiceStatus.PARTIALLY_PAID);
         }

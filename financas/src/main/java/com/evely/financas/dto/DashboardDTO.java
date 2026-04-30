@@ -37,4 +37,5 @@ public class DashboardDTO {
     private List<BudgetStatusDTO> budgets;
     private List<MonthProjectionDTO> projection;
     private boolean hasPartner;
+    private CoupleSettlementDTO settlement;
 }

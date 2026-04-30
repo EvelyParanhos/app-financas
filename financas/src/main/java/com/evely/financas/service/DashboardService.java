@@ -86,7 +86,11 @@ public class DashboardService {
 
         List<BudgetStatusDTO> budgets = budgetService.getStatusDoMes(userId, month, year);
         List<MonthProjectionDTO> projection = buildProjection(userId, month, year);
-        boolean hasPartner = partnershipRepository.findByUserId(userId).isPresent();
+        Optional<Partnership> partnership = partnershipRepository.findByUserId(userId);
+        boolean hasPartner = partnership.isPresent();
+        CoupleSettlementDTO settlement = partnership
+            .map(p -> buildCoupleSettlement(p, userId, inicio, fim))
+            .orElse(emptySettlement());
 
         return new DashboardDTO(
             currentBalance, accountBreakdown,
@@ -94,7 +98,7 @@ public class DashboardService {
             leftover, projectedIncome,
             toReceive, monthlyDeposits,
             invoices, installmentItems, recentTransactions,
-            budgets, projection, hasPartner
+            budgets, projection, hasPartner, settlement
         );
     }
 
@@ -148,6 +152,7 @@ public class DashboardService {
         List<TransactionItemDTO> recentTransactions = buildRecentTransactions(userId);
         List<BudgetStatusDTO> budgets = budgetService.getStatusDoMes(userId, month, year);
         List<MonthProjectionDTO> projection = buildProjection(userId, month, year);
+        CoupleSettlementDTO settlement = buildCoupleSettlement(partnership, userId, inicio, fim);
 
         return new DashboardDTO(
             saldoCompartilhado, breakdown,
@@ -155,7 +160,7 @@ public class DashboardService {
             leftover, projectedIncome,
             toReceive, monthlyDeposits,
             invoices, installmentItems, recentTransactions,
-            budgets, projection, true
+            budgets, projection, true, settlement
         );
     }
 
@@ -204,6 +209,68 @@ public class DashboardService {
     // =========================================================
     // HELPERS PRIVADOS
     // =========================================================
+
+    private CoupleSettlementDTO buildCoupleSettlement(
+            Partnership partnership, UUID viewerId, LocalDate inicio, LocalDate fim) {
+        User userA = partnership.getUserA();
+        User userB = partnership.getUserB();
+
+        User viewer = userA.getId().equals(viewerId) ? userA : userB;
+        User partner = userA.getId().equals(viewerId) ? userB : userA;
+
+        BigDecimal userPaidForPartner = safe(
+            installmentRepository.somarDespesasPagasPorOutroParceiro(
+                viewer.getId(), partner.getId(), inicio, fim));
+        BigDecimal partnerPaidForUser = safe(
+            installmentRepository.somarDespesasPagasPorOutroParceiro(
+                partner.getId(), viewer.getId(), inicio, fim));
+
+        BigDecimal net = userPaidForPartner.subtract(partnerPaidForUser);
+        if (net.compareTo(BigDecimal.ZERO) == 0) {
+            return new CoupleSettlementDTO(
+                false,
+                null,
+                null,
+                null,
+                null,
+                BigDecimal.ZERO,
+                userPaidForPartner,
+                partnerPaidForUser,
+                "Sem acerto pendente neste mes."
+            );
+        }
+
+        User debtor = net.compareTo(BigDecimal.ZERO) > 0 ? partner : viewer;
+        User creditor = net.compareTo(BigDecimal.ZERO) > 0 ? viewer : partner;
+        BigDecimal amount = net.abs();
+
+        return new CoupleSettlementDTO(
+            true,
+            debtor.getId(),
+            debtor.getName(),
+            creditor.getId(),
+            creditor.getName(),
+            amount,
+            userPaidForPartner,
+            partnerPaidForUser,
+            debtor.getName() + " precisa transferir R$ " + amount
+                + " para " + creditor.getName() + " para equilibrar o mes."
+        );
+    }
+
+    private CoupleSettlementDTO emptySettlement() {
+        return new CoupleSettlementDTO(
+            false,
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.ZERO,
+            BigDecimal.ZERO,
+            BigDecimal.ZERO,
+            "Conecte um parceiro para calcular o acerto do casal."
+        );
+    }
 
     /**
      * ✅ Usa account.balance diretamente — sem query de snapshot.

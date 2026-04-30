@@ -356,6 +356,10 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {(data?.hasPartner || user?.hasPartner) && data?.settlement && (
+            <SettlementCard settlement={data.settlement} viewMode={viewMode} />
+          )}
+
           {/* Orçamentos */}
           <div style={{ padding: '14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 10 }}>
@@ -561,6 +565,65 @@ function CheckItem({ item, isPaid, onCheck }) {
         color: isExpense ? 'var(--text-primary)' : 'var(--mint)', flexShrink: 0,
       }}>
         {isExpense ? '-' : '+'}{fmt(item.amount)}
+      </div>
+    </div>
+  )
+}
+
+function SettlementCard({ settlement, viewMode }) {
+  const active = settlement?.active && Number(settlement?.amount || 0) > 0
+  const primaryLabel = viewMode === 'partner' ? 'Parceiro pagou' : 'Você pagou'
+  const secondaryLabel = viewMode === 'partner' ? 'Você pagou' : 'Parceiro pagou'
+  return (
+    <div style={{ padding: '14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, marginBottom: 10 }}>
+        Acerto do casal
+      </div>
+      <div style={{
+        padding: '10px 12px', borderRadius: 8,
+        background: active ? 'rgba(46,203,170,0.07)' : 'var(--bg-raised)',
+        border: `1px solid ${active ? 'rgba(46,203,170,0.28)' : 'var(--border)'}`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <div style={{
+              width: 24, height: 24, borderRadius: 5, flexShrink: 0,
+              background: active ? 'rgba(46,203,170,0.12)' : 'var(--bg-overlay)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: active ? 'var(--teal)' : 'var(--text-muted)',
+            }}>
+              <ArrowLeftRight size={12} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {active ? `${settlement.debtorName} deve a ${settlement.creditorName}` : 'Sem acerto pendente'}
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Compras pagas pelo parceiro
+              </div>
+            </div>
+          </div>
+          <div style={{
+            fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 13,
+            color: active ? 'var(--teal)' : 'var(--text-muted)', flexShrink: 0,
+          }}>
+            {fmt(settlement?.amount)}
+          </div>
+        </div>
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
+          marginTop: 9, paddingTop: 8, borderTop: '1px solid var(--border)',
+          fontSize: 10,
+        }}>
+          <div>
+            <div style={{ color: 'var(--text-muted)' }}>{primaryLabel}</div>
+            <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{fmt(settlement?.userPaidForPartner)}</div>
+          </div>
+          <div>
+            <div style={{ color: 'var(--text-muted)' }}>{secondaryLabel}</div>
+            <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{fmt(settlement?.partnerPaidForUser)}</div>
+          </div>
+        </div>
       </div>
     </div>
   )

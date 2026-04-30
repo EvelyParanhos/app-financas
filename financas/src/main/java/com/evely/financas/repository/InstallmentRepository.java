@@ -59,7 +59,7 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
         AND i.dueDate BETWEEN :inicio AND :fim
         AND i.invoice IS NULL
         AND a.type <> com.evely.financas.enums.AccountType.CREDIT_CARD
-        AND t.type NOT IN ('INCOME', 'TRANSFER', 'INTERNAL_REPAYMENT')
+        AND t.type = 'EXPENSE'
         GROUP BY MONTH(i.dueDate), YEAR(i.dueDate)
         ORDER BY YEAR(i.dueDate), MONTH(i.dueDate)
     """)
@@ -161,6 +161,25 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
     );
 
     @Query("""
+        SELECT COALESCE(SUM(i.amount), 0)
+        FROM Installment i
+        JOIN i.transaction t
+        JOIN t.account a
+        WHERE a.owner.id = :accountOwnerId
+        AND i.payer.id = :responsibleUserId
+        AND a.owner.id <> i.payer.id
+        AND i.dueDate BETWEEN :inicio AND :fim
+        AND t.isSimulation = false
+        AND t.type = 'EXPENSE'
+    """)
+    BigDecimal somarDespesasPagasPorOutroParceiro(
+        @Param("accountOwnerId") UUID accountOwnerId,
+        @Param("responsibleUserId") UUID responsibleUserId,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim
+    );
+
+    @Query("""
         SELECT i FROM Installment i
         JOIN FETCH i.transaction t
         LEFT JOIN FETCH t.category
@@ -208,9 +227,24 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
 
     @Modifying
     @jakarta.transaction.Transactional
-    @Query("UPDATE Installment i SET i.status = :status WHERE i.invoice.id = :invoiceId")
+    @Query("""
+        UPDATE Installment i
+        SET i.status = :status
+        WHERE i.status <> :status
+        AND (
+            i.invoice.id = :invoiceId
+            OR (
+                i.transaction.account.id = :accountId
+                AND i.transaction.isSimulation = false
+                AND i.dueDate BETWEEN :inicio AND :fim
+            )
+        )
+    """)
     int markInvoiceInstallmentsAsStatus(
         @Param("invoiceId") UUID invoiceId,
+        @Param("accountId") UUID accountId,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim,
         @Param("status") InstallmentStatus status
     );
 }
